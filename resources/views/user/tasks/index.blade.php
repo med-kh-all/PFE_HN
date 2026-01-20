@@ -4,6 +4,7 @@
 
 @section('content')
 <style>
+/* 🔹 Animation si retard */
 .blink-red {
     animation: blink-red 1s infinite;
     color: #842029;
@@ -13,11 +14,58 @@
     0%, 100% { background-color: #f8d7da; }
     50% { background-color: #f1aeb5; }
 }
+
+/* 🔹 Textarea lisible */
 textarea.auto-expand {
     overflow: hidden;
-    resize: none;
-    min-height: 38px;
+    resize: vertical;
+    min-height: 60px;
     width: 100%;
+    padding: 8px;
+    font-size: 0.9rem;
+}
+
+/* 🔹 Uniformisation filtres et boutons */
+.form-select, .btn {
+    border-radius: 8px;
+    height: 42px !important;
+    font-size: 0.95rem;
+}
+
+/* 🔹 Agrandir champs filtrage */
+#filter_responsible, #filter_status {
+    width: 100% !important;
+    min-width: 250px;
+    padding: 8px 12px;
+}
+
+/* 🔹 Espacement entre boutons */
+.filter-actions .btn {
+    margin-left: 10px;
+}
+
+/* Icônes dans boutons */
+.btn-sm i {
+    font-size: 14px;
+}
+
+/* 🔹 Espacement général */
+.card-body .row.g-3 {
+    gap: 20px 0;
+}
+
+/* 🔹 Couleurs statut */
+.status-todo {
+    background-color: #f8d7da !important;
+    color: #842029;
+}
+.status-progress {
+    background-color: #fff3cd !important;
+    color: #856404;
+}
+.status-done {
+    background-color: #d4edda !important;
+    color: #155724;
 }
 </style>
 
@@ -37,52 +85,68 @@ textarea.auto-expand {
 
         <div class="content-body">
 
+            {{-- 🔹 Filtres --}}
             <form method="GET" action="{{ route('user.tasks.index') }}">
-    <div class="card mb-3">
-        <div class="card-body">
-            <div class="row align-items-end g-3">
-                <div class="col-md-4">
-                    <label for="filter_responsible" class="form-label">Responsable</label>
-                    <select name="responsible" id="filter_responsible" class="form-select form-select-lg" style="min-width: 100%; height: 42px;">
-                        <option value="">Tous</option>
-                        @foreach($responsibles as $responsible)
-                            <option value="{{ $responsible }}" {{ request('responsible') == $responsible ? 'selected' : '' }}>
-                                {{ ucfirst($responsible) }}
-                            </option>
-                        @endforeach
-                    </select>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-md-4">
+                                <label for="filter_responsible" class="form-label">Responsable</label>
+                                <select name="responsible" id="filter_responsible" class="form-select form-select-lg">
+                                    <option value="">Tous</option>
+                                    @foreach($responsibles as $responsible)
+                                        <option value="{{ $responsible }}" {{ request('responsible') == $responsible ? 'selected' : '' }}>
+                                            {{ ucfirst($responsible) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="filter_status" class="form-label">Statut</label>
+                                <select name="status" id="filter_status" class="form-select form-select-lg">
+                                    <option value="">Tous</option>
+                                    <option value="À faire" {{ request('status') == 'À faire' ? 'selected' : '' }}>À faire</option>
+                                    <option value="En cours" {{ request('status') == 'En cours' ? 'selected' : '' }}>En cours</option>
+                                    <option value="Terminé" {{ request('status') == 'Terminé' ? 'selected' : '' }}>Terminé</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4 d-flex align-items-end justify-content-end filter-actions">
+                                <button type="submit" class="btn btn-primary btn-sm d-flex align-items-center gap-1" style="background:#5A55FF; border-color:#5A55FF;">
+                                    <i class="fas fa-filter"></i> Filtrer
+                                </button>
+                                <a href="{{ route('user.tasks.index') }}" class="btn btn-secondary btn-sm d-flex align-items-center gap-1">
+                                    <i class="fas fa-times"></i> Clear
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-                <div class="col-md-4">
-                    <label for="filter_status" class="form-label">Statut</label>
-                    <select name="status" id="filter_status" class="form-select form-select-lg" style="min-width: 100%; height: 42px;">
-                        <option value="">Tous</option>
-                        <option value="À faire" {{ request('status') == 'À faire' ? 'selected' : '' }}>À faire</option>
-                        <option value="En cours" {{ request('status') == 'En cours' ? 'selected' : '' }}>En cours</option>
-                        <option value="Terminé" {{ request('status') == 'Terminé' ? 'selected' : '' }}>Terminé</option>
-                    </select>
-                </div>
-
-                <div class="col-md-4 d-flex align-items-end justify-content-end gap-2">
-                    <button type="submit" class="btn btn-success btn-sm" style="height: 38px; min-width: 120px;">Filtrer</button>
-                    <a href="{{ route('user.tasks.index') }}" class="btn btn-secondary btn-sm" style="height: 38px; min-width: 120px;">Clear</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</form>
-
-
+            </form>
 
             {{-- 📋 Tableau des tâches --}}
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="card-title mb-0">Tableau de gestion des tâches</h4>
-                    <div>
-                        <button type="button" id="addRow" class="btn btn-outline-primary btn-sm">+ Ajouter une tâche</button>
-                        <form id="massDeleteForm" method="POST" action="{{ route('user.tasks.massDelete') }}" class="d-inline" onsubmit="return confirm('Voulez-vous vraiment supprimer les tâches sélectionnées ?')">
+                    <div class="col-md-4 d-flex align-items-end justify-content-end filter-actions">
+                        <!-- Ajouter -->
+                        <button type="button" id="addRow" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2" style="border-color:#5A55FF; color:#5A55FF;">
+                            <i class="fas fa-plus"></i> Ajouter
+                        </button>
+
+                        <!-- Enregistrer -->
+                        <button type="submit" form="taskForm" class="btn btn-primary btn-sm d-flex align-items-center gap-2" style="background:#5A55FF; border-color:#5A55FF;">
+                            <i class="fas fa-check"></i> Enregistrer
+                        </button>
+
+                        <!-- Supprimer -->
+                        <form id="massDeleteForm" method="POST" action="{{ route('user.tasks.massDelete') }}" class="d-inline"
+                              onsubmit="return confirm('Voulez-vous vraiment supprimer les tâches sélectionnées ?')">
                             @csrf
-                            <button type="submit" class="btn btn-danger btn-sm">Supprimer sélection</button>
+                            <button type="submit" class="btn btn-danger btn-sm d-flex align-items-center gap-2">
+                                <i class="fas fa-trash"></i> Supprimer
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -95,8 +159,8 @@ textarea.auto-expand {
                     <form id="taskForm" method="POST" action="{{ route('user.tasks.store') }}">
                         @csrf
                         <div class="table-responsive">
-                            <table class="table text-center align-middle" style="border-collapse: collapse; border: none;">
-                                <thead>
+                            <table class="table text-center align-middle">
+                                <thead class="table-light">
                                     <tr>
                                         <th><input type="checkbox" id="checkAll"></th>
                                         <th>Date de réunion</th>
@@ -116,11 +180,11 @@ textarea.auto-expand {
                                     @php
                                         $isOverdue = $task->due_date && \Carbon\Carbon::parse($task->due_date)->isPast();
                                         $autoStatus = $isOverdue && $task->status != 'Terminé' ? 'En cours' : $task->status;
-                                        $statusColor = match($autoStatus) {
-                                            'À faire' => '#f8d7da',
-                                            'En cours' => '#fff3cd',
-                                            'Terminé' => '#d4edda',
-                                            default => '#ffffff'
+                                        $statusClass = match($autoStatus) {
+                                            'À faire' => 'status-todo',
+                                            'En cours' => 'status-progress',
+                                            'Terminé' => 'status-done',
+                                            default => ''
                                         };
                                     @endphp
                                     <tr>
@@ -136,7 +200,7 @@ textarea.auto-expand {
                                         <td><input type="email" name="responsible_email[]" class="form-control form-control-sm" value="{{ $task->responsible_email }}"></td>
                                         <td><input type="date" name="due_date[]" class="form-control form-control-sm" value="{{ $task->due_date }}"></td>
                                         <td>
-                                            <select name="status[]" class="form-control form-control-sm {{ $isOverdue && $autoStatus != 'Terminé' ? 'blink-red' : '' }}" style="background-color: {{ $statusColor }}">
+                                            <select name="status[]" class="form-control form-control-sm {{ $statusClass }} {{ $isOverdue && $autoStatus != 'Terminé' ? 'blink-red' : '' }}">
                                                 <option value="À faire" {{ $autoStatus == 'À faire' ? 'selected' : '' }}>À faire</option>
                                                 <option value="En cours" {{ $autoStatus == 'En cours' ? 'selected' : '' }}>En cours</option>
                                                 <option value="Terminé" {{ $autoStatus == 'Terminé' ? 'selected' : '' }}>Terminé</option>
@@ -152,10 +216,6 @@ textarea.auto-expand {
                                     @endforeach
                                 </tbody>
                             </table>
-
-                            <div class="text-end mt-3">
-                                <button type="submit" class="btn btn-success">Enregistrer toutes les lignes</button>
-                            </div>
                         </div>
                     </form>
                 </div>
@@ -187,9 +247,9 @@ document.getElementById('addRow').addEventListener('click', function () {
         <td><input type="date" name="due_date[]" class="form-control form-control-sm"></td>
         <td>
             <select name="status[]" class="form-control form-control-sm">
-                <option value="À faire" style="background-color:#f8d7da">À faire</option>
-                <option value="En cours" style="background-color:#fff3cd">En cours</option>
-                <option value="Terminé" style="background-color:#d4edda">Terminé</option>
+                <option value="À faire" class="status-todo">À faire</option>
+                <option value="En cours" class="status-progress">En cours</option>
+                <option value="Terminé" class="status-done">Terminé</option>
             </select>
         </td>
         <td><textarea name="comments[]" class="form-control form-control-sm auto-expand"></textarea></td>

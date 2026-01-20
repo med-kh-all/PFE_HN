@@ -31,9 +31,37 @@
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="rrq" value="{{ old('rrq', $employee->rrq) }}" readonly></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="ae" value="{{ old('ae', $employee->ae) }}" readonly></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="rqap" value="{{ old('rqap', $employee->rqap) }}" readonly></td>
-    <td><input type="number" step="0.01" class="form-control form-control-sm" name="csst" value="{{ old('csst', $employee->csst) }}" readonly></td>
-    <td><input type="number" step="0.01" class="form-control form-control-sm" name="fssq" value="{{ old('fssq', $employee->fssq) }}" readonly></td>
-    <td><input type="number" step="0.01" class="form-control form-control-sm" name="cnt" value="{{ old('cnt', $employee->cnt) }}" readonly></td>
+   {{-- CSST uniquement hors CCQ --}}
+@unless((int)($isCCQ ?? 0) === 1)
+  <td><input type="number" step="0.01" class="form-control form-control-sm" name="csst"
+             value="{{ old('csst', $employee->csst) }}"></td>
+@endunless
+
+<td><input type="number" step="0.01" class="form-control form-control-sm" name="fssq"
+           value="{{ old('fssq', $employee->fssq) }}"></td>
+
+{{-- 🔻 Champs CCQ insérés ICI quand modèle CCQ --}}
+@if((int)($isCCQ ?? 0) === 1)
+<td><input type="number" step="0.01" class="form-control form-control-sm" name="avantages_sociaux"
+             value="{{ old('avantages_sociaux', $employee->ccq->avantages_sociaux?? null) }}"></td>
+<td><input type="number" step="0.01" class="form-control form-control-sm" name="taxes_assurance"
+             value="{{ old('taxes_assurance', $employee->ccq->taxes_assurance ?? null) }}"></td>
+  <td><input type="number" step="0.01" class="form-control form-control-sm" name="ccq"
+             value="{{ old('ccq', $employee->ccq->ccq ?? null) }}"></td>
+  <td><input type="number" step="0.01" class="form-control form-control-sm" name="aecq"
+             value="{{ old('aecq', $employee->ccq->aecq ?? null) }}"></td>
+  <td><input type="number" step="0.01" class="form-control form-control-sm" name="fonds_divers"
+             value="{{ old('fonds_divers', $employee->ccq->fonds_divers ?? null) }}"></td>
+  <td><input type="number" step="0.01" class="form-control form-control-sm" name="equipement_securite"
+             value="{{ old('equipement_securite', $employee->ccq->equipement_securite ?? null) }}"></td>
+  <td><input type="number" step="0.01" class="form-control form-control-sm" name="clauses_normatives"
+             value="{{ old('clauses_normatives', $employee->ccq->clauses_normatives ?? null) }}"></td>
+@endif
+{{-- 🔺 Fin CCQ --}}
+
+{{-- CNT (affiché "CNESST" en tête si CCQ, mais le name reste "cnt") --}}
+<td><input type="number" step="0.01" class="form-control form-control-sm" name="cnt"
+           value="{{ old('cnt', $employee->cnt) }}" readonly></td>
 
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="other_benefits" value="{{ old('other_benefits', $employee->other_benefits) }}"></td>
 
@@ -59,9 +87,7 @@
 
     <td>
         <div class="d-flex justify-content-center gap-1">
-            <button class="btn btn-success btn-sm btn-save-employee" title="Enregistrer">
-                <i class="fas fa-save"></i>
-            </button>
+           
             <button class="btn btn-danger btn-sm btn-delete-employee" title="Supprimer">
                 <i class="fas fa-trash"></i>
             </button>

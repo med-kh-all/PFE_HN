@@ -54,8 +54,18 @@
                                                 <th>Location</th>
                                                 <th>Amortissement</th>
                                                 @foreach($colonnesPersonnalisees as $colonne)
-                                                    <th>{{ $colonne['title'] ?? $colonne }}</th>
-                                                @endforeach
+                                                <th data-slug="{{ $colonne }}">
+                                                <span class="col-title">{{ $titresColonnesPersonnalisees[$colonne] ?? $colonne }}</span>
+                                                <button type="button" class="btn btn-sm btn-link p-0 edit-col" data-slug="{{ $colonne }}" title="Modifier">
+                                                  ✏️
+                                                 </button>
+                                                  <button type="button" class="btn btn-sm btn-link text-danger p-0 delete-col" data-slug="{{ $colonne }}" title="Supprimer">
+                                                 ❌
+                                                 </button>
+                                                   </th>
+                                                 @endforeach
+
+                                               
                                                 <th style="min-width: 200px">Total Dépenses Directes</th>
                                                 <th>Actions</th>
                                             </tr>
@@ -79,13 +89,18 @@
                                                     <td><input type="number" step="0.01" name="interet[]" class="form-control form-control-sm" value="{{ $camion->interet }}"></td>
                                                     <td><input type="number" step="0.01" name="location[]" class="form-control form-control-sm" value="{{ $camion->location }}"></td>
                                                     <td><input type="number" step="0.01" name="amortissement[]" class="form-control form-control-sm" value="{{ $camion->amortissement }}"></td>
-                                                    @foreach($colonnesPersonnalisees as $colonne)
-                                                        @php
-                                                            $slug = is_array($colonne) ? $colonne['slug'] : $colonne;
-                                                            $value = $camion->colonnes_personnalisees[$slug] ?? '';
-                                                        @endphp
-                                                        <td><input type="number" step="0.01" name="personnalise[{{ $slug }}][]" class="form-control form-control-sm" value="{{ $value }}"></td>
+                                                   @foreach($colonnesPersonnalisees as $colonne)
+                                                     @php
+                                                     $value = $camion->colonnes_personnalisees[$colonne] ?? '';
+                                                      @endphp
+                                                     <td>
+                                                     <input type="number" step="0.01"
+                                                      name="personnalise[{{ $colonne }}][]"
+                                                     class="form-control form-control-sm"
+                                                     value="{{ $value }}">
+                                                     </td>
                                                     @endforeach
+
                                                     <td><input type="number" step="0.01" name="total_depenses[]" class="form-control form-control-sm" value="{{ $camion->total_depenses }}" readonly></td>
                                                     <td class="text-center">
                                                         <div class="d-flex justify-content-center gap-2">
@@ -95,8 +110,11 @@
                                                             <button type="button" class="btn btn-sm rounded-circle bg-white d-flex align-items-center justify-content-center border-0" title="Modifier">
                                                                 <i class="fas fa-edit" style="font-size: 14px; color:#5A55FF;"></i>
                                                             </button>
-                                                            <button type="button" class="btn btn-sm rounded-circle bg-white d-flex align-items-center justify-content-center border-0" title="Supprimer" onclick="deleteRow(this)">
-                                                                <i class="fas fa-trash" style="font-size: 14px; color:#5A55FF;"></i>
+                                                           <button type="button"
+                                                              class="btn btn-sm rounded-circle bg-white d-flex align-items-center justify-content-center border-0"
+                                                              title="Supprimer"
+                                                              onclick="deleteRow(this, {{ $camion->id }})">
+                                                             <i class="fas fa-trash" style="font-size: 14px; color:#5A55FF;"></i>
                                                             </button>
                                                         </div>
                                                     </td>
@@ -111,6 +129,14 @@
                                     </table>
                                 </div>
                             </div>
+                             <!-- 🔹 Champ caché pour stocker slug + title -->
+                              <input type="hidden" id="custom_columns" name="custom_columns" value="{{ json_encode(
+                                 collect($colonnesPersonnalisees)->map(fn($c) => [
+                                 'slug' => $c,
+                                 'title' => $titresColonnesPersonnalisees[$c] ?? $c
+                                 ])->values()
+                                 ) }}">
+
                         </form>
                     </div>
                 </div>
@@ -123,15 +149,24 @@
 // Initialisation des variables
 const existingCamions = @json($camions ?? []);
 const existingPersonnalisees = @json($colonnesPersonnalisees ?? []);
-let customColumns = existingPersonnalisees.map(c => typeof c === 'object' ? c.slug : c);
-const columnTitles = Object.fromEntries((existingPersonnalisees || []).map(c => [c.slug || c, c.title || c]));
+let customColumns = (existingPersonnalisees || []).map(c => {
+    return typeof c === 'object' ? c : { slug: c, title: @json($titresColonnesPersonnalisees)[c] || c };
+});
+
+// Fonction utilitaire
+function sumColumn(name) {
+    let sum = 0;
+    document.querySelectorAll(`input[name="${name}"]`).forEach(input => {
+        sum += parseFloat(input.value) || 0;
+    });
+    return sum;
+}
 
 // Fonction pour créer une nouvelle ligne
 function createRow(data = {}) {
     const tbody = document.getElementById("tableBody");
     const tr = document.createElement("tr");
-    
-    // Colonnes fixes
+
     const fixedColumns = [
         {name: "unite", type: "text"},
         {name: "annee_de_construction", type: "number"},
@@ -170,8 +205,8 @@ function createRow(data = {}) {
         const input = document.createElement("input");
         input.type = "number";
         input.className = "form-control form-control-sm";
-        input.name = `personnalise[${col}][]`;
-        input.value = data.colonnes_personnalisees?.[col] || "";
+        input.name = `personnalise[${col.slug}][]`;
+        input.value = data.colonnes_personnalisees?.[col.slug] || "";
         input.step = "0.01";
         input.addEventListener("input", updateRowTotals);
         td.appendChild(input);
@@ -194,15 +229,18 @@ function createRow(data = {}) {
     actionsTd.className = "text-center";
     actionsTd.innerHTML = `
         <div class="d-flex justify-content-center gap-2">
-            <button type="submit" class="btn btn-sm rounded-circle bg-white d-flex align-items-center justify-content-center border-0" title="Sauvegarder">
-                <i class="fas fa-check" style="font-size: 14px; color:#5A55FF;"></i>
+            <button type="submit" class="btn btn-sm rounded-circle bg-white border-0" title="Sauvegarder">
+                <i class="fas fa-check" style="font-size:14px;color:#5A55FF;"></i>
             </button>
-            <button type="button" class="btn btn-sm rounded-circle bg-white d-flex align-items-center justify-content-center border-0" title="Modifier">
-                <i class="fas fa-edit" style="font-size: 14px; color:#5A55FF;"></i>
+            <button type="button" class="btn btn-sm rounded-circle bg-white border-0" title="Modifier">
+                <i class="fas fa-edit" style="font-size:14px;color:#5A55FF;"></i>
             </button>
-            <button type="button" class="btn btn-sm rounded-circle bg-white d-flex align-items-center justify-content-center border-0" title="Supprimer" onclick="deleteRow(this)">
-                <i class="fas fa-trash" style="font-size: 14px; color:#5A55FF;"></i>
-            </button>
+            <button type="button"
+        class="btn btn-sm rounded-circle bg-white d-flex align-items-center justify-content-center border-0"
+        title="Supprimer"
+        onclick="deleteRow(this, {{ $camion->id }})">
+    <i class="fas fa-trash" style="font-size: 14px; color:#5A55FF;"></i>
+</button>
         </div>
     `;
     tr.appendChild(actionsTd);
@@ -211,63 +249,74 @@ function createRow(data = {}) {
     updateRowTotals();
 }
 
-// Fonction pour supprimer une ligne
-function deleteRow(button) {
-    if (confirm("Voulez-vous vraiment supprimer cette ligne ?")) {
-        const tr = button.closest("tr");
-        tr.remove();
-        updateSummary();
+function deleteRow(button, id = null) {
+    if (!confirm("Voulez-vous vraiment supprimer cette ligne ?")) return;
+
+    // Supprimer la ligne visuellement
+    const tr = button.closest("tr");
+    tr.remove();
+    updateSummary();
+
+    // Si un ID existe -> supprimer en base
+    if (id) {
+        fetch(`/user/coutscamion/${id}`, {
+            method: "DELETE",
+            headers: {
+                "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute("content"),
+                "Accept": "application/json"
+            }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Erreur réseau");
+            return res.json();
+        })
+        .then(data => {
+            if (data.success) {
+                toastr.success("Ligne supprimée avec succès");
+            } else {
+                toastr.error("Erreur lors de la suppression en base");
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            toastr.error("Erreur lors de la suppression");
+        });
     }
 }
 
-// Fonction pour mettre à jour les totaux de chaque ligne
+
+
+
+// Mise à jour des totaux par ligne
 function updateRowTotals() {
     document.querySelectorAll("#tableBody tr").forEach(row => {
         let total = 0;
-
-        // Colonnes de coût fixes
-        const costColumns = ['carburant', 'entretien', 'immatriculation', 'assurance', 'interet', 'location', 'amortissement'];
+        const costColumns = ['carburant','entretien','immatriculation','assurance','interet','location','amortissement'];
         costColumns.forEach(col => {
             const input = row.querySelector(`input[name="${col}[]"]`);
-            if (input) {
-                total += parseFloat(input.value) || 0;
-            }
+            total += parseFloat(input?.value) || 0;
         });
-
-        // Colonnes personnalisées
         row.querySelectorAll("input[name^='personnalise[']").forEach(input => {
             total += parseFloat(input.value) || 0;
         });
-
-        // Mettre à jour le total
         const totalInput = row.querySelector("input[name='total_depenses[]']");
-        if (totalInput) {
-            totalInput.value = total.toFixed(2);
-        }
+        if (totalInput) totalInput.value = total.toFixed(2);
 
-        // Calculer coût/km et coût/heure
-        const kmInput = row.querySelector("input[name='km_parcourus[]']");
-        const heuresInput = row.querySelector("input[name='heures[]']");
-        const coutKmInput = row.querySelector("input[name='cout_km[]']");
-        const coutHrInput = row.querySelector("input[name='cout_hr[]']");
-
-        const km = parseFloat(kmInput?.value) || 0;
-        const heures = parseFloat(heuresInput?.value) || 0;
-
-        if (coutKmInput) coutKmInput.value = km > 0 ? (total / km).toFixed(2) : "0.00";
-        if (coutHrInput) coutHrInput.value = heures > 0 ? (total / heures).toFixed(2) : "0.00";
+        const km = parseFloat(row.querySelector("input[name='km_parcourus[]']")?.value) || 0;
+        const heures = parseFloat(row.querySelector("input[name='heures[]']")?.value) || 0;
+        if (km > 0) row.querySelector("input[name='cout_km[]']").value = (total/km).toFixed(2);
+        if (heures > 0) row.querySelector("input[name='cout_hr[]']").value = (total/heures).toFixed(2);
     });
 }
 
-// Fonction pour mettre à jour le résumé
+// Mise à jour du résumé (footer)
 function updateSummary() {
     updateRowTotals();
     
-    const summary = {};
     const tfoot = document.getElementById("summaryRow");
     tfoot.innerHTML = "";
 
-    // Ajouter les colonnes fixes
+    // Colonnes fixes
     const fixedColumns = [
         {name: "unite", isTotal: true},
         {name: "annee_de_construction"},
@@ -289,20 +338,15 @@ function updateSummary() {
 
     fixedColumns.forEach(col => {
         const td = document.createElement("td");
-        
         if (col.isTotal) {
             td.textContent = "Total";
         } else if (col.isCalc) {
-            // Calcul spécial pour cout_km et cout_hr
             const kmTotal = sumColumn("km_parcourus[]");
             const heuresTotal = sumColumn("heures[]");
             const totalDepenses = sumColumn("total_depenses[]");
-            
-            if (col.name === "cout_km") {
-                td.textContent = kmTotal > 0 ? (totalDepenses / kmTotal).toFixed(2) : "0.00";
-            } else {
-                td.textContent = heuresTotal > 0 ? (totalDepenses / heuresTotal).toFixed(2) : "0.00";
-            }
+            td.textContent = col.name === "cout_km"
+                ? (kmTotal > 0 ? (totalDepenses / kmTotal).toFixed(2) : "0.00")
+                : (heuresTotal > 0 ? (totalDepenses / heuresTotal).toFixed(2) : "0.00");
             td.classList.add("bg-info", "text-white");
         } else if (col.isSum) {
             const sum = sumColumn(`${col.name}[]`);
@@ -310,93 +354,153 @@ function updateSummary() {
         } else {
             td.textContent = "";
         }
-        
         tfoot.appendChild(td);
     });
 
     // Colonnes personnalisées
-    customColumns.forEach(col => {
-        const sum = sumColumn(`personnalise[${col}][]`);
-        const td = document.createElement("td");
-        td.textContent = sum.toFixed(2);
-        tfoot.appendChild(td);
-    });
+customColumns.forEach(col => {
+    const slug = col.slug || col;
+    const sum = sumColumn(`personnalise[${slug}][]`);
+    const td = document.createElement("td");
+    td.textContent = sum.toFixed(2);
+    td.dataset.slug = slug;
+    tfoot.appendChild(td);
+});
 
-    // Total dépenses
-    const totalDepenses = sumColumn("total_depenses[]");
-    const totalTd = document.createElement("td");
-    totalTd.textContent = totalDepenses.toFixed(2);
-    totalTd.classList.add("bg-info", "text-white");
-    tfoot.appendChild(totalTd);
+// Ensuite seulement → Total Dépenses
+const totalDepenses = sumColumn("total_depenses[]");
+const totalTd = document.createElement("td");
+totalTd.textContent = totalDepenses.toFixed(2);
+totalTd.classList.add("bg-info", "text-white");
+tfoot.appendChild(totalTd);
 
-    // Actions (vide)
-    tfoot.appendChild(document.createElement("td"));
-}
+// Puis la colonne Actions vide
+tfoot.appendChild(document.createElement("td"));
 
-// Fonction utilitaire pour faire la somme d'une colonne
-function sumColumn(name) {
-    let sum = 0;
-    document.querySelectorAll(`input[name="${name}"]`).forEach(input => {
-        sum += parseFloat(input.value) || 0;
-    });
-    return sum;
 }
 
 // Ajouter une colonne personnalisée
-document.getElementById("addColumn").addEventListener("click", () => {
-    const title = prompt("Entrez le titre de la nouvelle colonne:");
-    if (!title) return;
-
-    const slug = `col_${Date.now()}`;
-    const columnData = { slug, title };
+document.getElementById("addColumn").addEventListener("click",()=>{
+    const title=prompt("Entrez le titre de la nouvelle colonne:");
+    if(!title) return;
+    const slug=`col_${Date.now()}`;
+    const columnData={slug,title};
     customColumns.push(columnData);
 
-    // Ajouter l'en-tête
-    const th = document.createElement("th");
-    th.textContent = title;
-    th.dataset.slug = slug;
-    
-    const header = document.getElementById("tableHead");
-    const totalTh = header.querySelector("th:nth-last-child(2)");
-    header.insertBefore(th, totalTh);
+    let hiddenInput=document.getElementById("custom_columns");
+    let current=hiddenInput.value?JSON.parse(hiddenInput.value):[];
+    current.push(columnData);
+    hiddenInput.value=JSON.stringify(current);
 
-    // Ajouter aux lignes existantes
-    document.querySelectorAll("#tableBody tr").forEach(tr => {
-        const td = document.createElement("td");
-        const input = document.createElement("input");
-        input.type = "number";
-        input.className = "form-control form-control-sm";
-        input.name = `personnalise[${slug}][]`;
-        input.step = "0.01";
-        input.addEventListener("input", updateRowTotals);
+    const th=document.createElement("th");
+    th.dataset.slug=slug;
+    th.innerHTML=`
+        <span class="col-title">${title}</span>
+        <button type="button" class="btn btn-sm btn-link p-0 edit-col" data-slug="${slug}" title="Modifier">✏️</button>
+        <button type="button" class="btn btn-sm btn-link text-danger p-0 delete-col" data-slug="${slug}" title="Supprimer">❌</button>
+    `;
+    const header=document.getElementById("tableHead");
+    header.insertBefore(th,header.querySelector("th:nth-last-child(2)"));
+
+    document.querySelectorAll("#tableBody tr").forEach(tr=>{
+        const td=document.createElement("td");
+        const input=document.createElement("input");
+        input.type="number";input.className="form-control form-control-sm";
+        input.name=`personnalise[${slug}][]`;input.step="0.01";
+        input.addEventListener("input",updateRowTotals);
         td.appendChild(input);
-        tr.insertBefore(td, tr.querySelector("td:nth-last-child(2)"));
+        tr.insertBefore(td,tr.querySelector("td:nth-last-child(2)"));
     });
 
-    // Ajouter au pied de tableau
-    const tfoot = document.getElementById("summaryRow");
-    const td = document.createElement("td");
-    td.textContent = "0.00";
-    tfoot.insertBefore(td, tfoot.querySelector("td:nth-last-child(2)"));
-
+    const tfoot=document.getElementById("summaryRow");
+    const td=document.createElement("td");
+    td.textContent="0.00";td.dataset.slug=slug;
+    tfoot.insertBefore(td,tfoot.querySelector("td:nth-last-child(2)"));
     updateSummary();
 });
 
-// Ajouter une nouvelle ligne
-document.getElementById("addRow").addEventListener("click", () => createRow());
-
-// Initialisation au chargement
-document.addEventListener("DOMContentLoaded", () => {
-    if (existingCamions.length === 0) {
-        createRow();
-    }
-    updateSummary();
+// Gérer ✏️ et ❌
+document.addEventListener("click",function(e){
+    const btn=e.target.closest("button");
+    if(!btn) return;
+    if(btn.classList.contains("edit-col")) editColumn(btn.dataset.slug);
+    if(btn.classList.contains("delete-col")) deleteColumn(btn.dataset.slug);
 });
 
-// Gestion de la soumission du formulaire
-$('#camionForm').on('submit', function(e) {
+// Editer titre
+function editColumn(slug){
+    const th=document.querySelector(`th[data-slug="${slug}"]`);
+    const span=th.querySelector(".col-title");
+    const input=document.createElement("input");
+    input.type="text";input.value=span.textContent;
+    input.className="form-control form-control-sm d-inline-block";
+    input.style.width="120px";
+    th.replaceChild(input,span);
+    input.focus();
+    input.addEventListener("blur",()=>saveColumnTitle(slug,input.value));
+    input.addEventListener("keydown",e=>{
+        if(e.key==="Enter") saveColumnTitle(slug,input.value);
+        if(e.key==="Escape") th.replaceChild(span,input);
+    });
+}
+
+// Sauver titre
+function saveColumnTitle(slug,newTitle){
+    const th=document.querySelector(`th[data-slug="${slug}"]`);
+    const input=th.querySelector("input");
+    const span=document.createElement("span");
+    span.className="col-title";span.textContent=newTitle;
+    th.replaceChild(span,input);
+
+    let hiddenInput=document.getElementById("custom_columns");
+    let current=hiddenInput.value?JSON.parse(hiddenInput.value):[];
+    current=current.map(c=>c.slug===slug?{...c,title:newTitle}:c);
+    hiddenInput.value=JSON.stringify(current);
+}
+
+// Supprimer une colonne
+function deleteColumn(slug) {
+    if (!confirm("Voulez-vous vraiment supprimer cette colonne ?")) return;
+
+    // Supprimer du DOM
+    document.querySelector(`th[data-slug="${slug}"]`)?.remove();
+    document.querySelectorAll(`#tableBody tr`).forEach(tr => {
+        const td = tr.querySelector(`input[name="personnalise[${slug}][]"]`);
+        if (td) td.closest("td").remove();
+    });
+    document.querySelectorAll(`#summaryRow td[data-slug="${slug}"]`).forEach(td => td.remove());
+    updateSummary();
+
+    // 🔹 Supprimer en BDD via AJAX
+    fetch(`/user/coutscamion/column/${slug}`, {
+        method: "DELETE",
+        headers: {
+            "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content,
+            "Accept": "application/json"
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            toastr.success("Colonne supprimée");
+        } else {
+            toastr.error("Erreur lors de la suppression");
+        }
+    })
+    .catch(() => toastr.error("Erreur serveur"));
+}
+
+
+
+// Init
+document.addEventListener("DOMContentLoaded",()=>{
+    if(existingCamions.length===0) createRow();
+    updateSummary();
+});
+// Sauvegarde AJAX du formulaire
+$('#camionForm').on('submit', function (e) {
     e.preventDefault();
-    
+
     let form = $(this);
     let submitBtn = form.find('button[type="submit"]');
     submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Enregistrement...');
@@ -405,22 +509,25 @@ $('#camionForm').on('submit', function(e) {
         url: form.attr('action'),
         method: 'POST',
         data: form.serialize(),
-        success: function(response) {
-            if(response.success) {
-                toastr.success(response.message);
-                setTimeout(() => window.location.reload(), 1500);
+        success: function (response) {
+            if (response.success) {
+                toastr.success(response.message || "Données sauvegardées avec succès ✅");
+                // 🔹 Recalculer les totaux sans reload
+                updateSummary();
             } else {
-                toastr.error(response.message || "Erreur lors de l'enregistrement");
+                toastr.error(response.message || "Erreur lors de l'enregistrement ❌");
             }
         },
-        error: function(xhr) {
+        error: function (xhr) {
             let errorMsg = xhr.responseJSON?.message || "Erreur serveur";
             toastr.error(errorMsg);
         },
-        complete: function() {
+        complete: function () {
             submitBtn.prop('disabled', false).html('<i class="fas fa-check"></i> Sauvegarder');
         }
     });
 });
+
 </script>
+
 @endsection

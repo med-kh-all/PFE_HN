@@ -21,7 +21,13 @@ class employees extends Model
 
     // Relation avec l'activité (operation_type)
     public function operationType()
+{
+    return $this->belongsTo(OperationType::class, 'operation_type_id', 'id');
+}
+
+
+    public function ccq()
     {
-        return $this->belongsTo(OperationType::class);
-    }
+    return $this->hasOne(EmployeeCCQ::class, 'employee_id');
+     }
 }

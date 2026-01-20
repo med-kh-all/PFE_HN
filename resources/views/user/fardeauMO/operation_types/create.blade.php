@@ -40,27 +40,50 @@
                                 <i data-feather="arrow-left"></i>
                             </button>
                         </div>
+
                         <div class="card-body">
                             <form method="post" action="{{ route('user.fardeauMO.operation_types.store') }}">
                                 @csrf
 
-                                <!-- 🔹 Champ Nom du Type d'Opération -->
+                                <!-- 🔹 Nom du Type d'Opération -->
                                 <div class="form-group">
                                     <label>Nom du Type d'Opération</label>
-                                    <input type="text" class="form-control" name="name" placeholder="Ex: Opération CCTV" required>
+                                    <input type="text"
+                                           class="form-control"
+                                           name="name"
+                                           placeholder="Ex: Opération CCTV"
+                                           value="{{ old('name') }}"
+                                           required>
+                                </div>
+
+                                <!-- 🔹 Modèle CCQ (booléen) -->
+                                <!-- IMPORTANT : input hidden pour forcer l'envoi de 0 si la checkbox est décochée -->
+                                <input type="hidden" name="is_ccq" value="0">
+                                <div class="form-group form-check mt-2">
+                                    <input type="checkbox"
+                                           class="form-check-input"
+                                           id="is_ccq"
+                                           name="is_ccq"
+                                           value="1"
+                                           {{ old('is_ccq') ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="is_ccq">
+                                        Modèle CCQ (afficher les colonnes CCQ)
+                                    </label>
                                 </div>
 
                                 <!-- 🔹 Boutons -->
-                                <div class="mt-3">
+                                <div class="mt-3 d-flex gap-1">
                                     <button type="submit" class="btn btn-primary">Enregistrer</button>
                                     <button type="reset" class="btn btn-secondary">Réinitialiser</button>
                                 </div>
                             </form>
                         </div>
+
                     </div>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 

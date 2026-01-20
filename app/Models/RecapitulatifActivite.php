@@ -1,6 +1,7 @@
 <?php
 // app/Models/RecapitulatifActivite.php
 namespace App\Models;
+
  
 use Illuminate\Database\Eloquent\Model;
  
@@ -10,6 +11,7 @@ class RecapitulatifActivite extends Model
  
     protected $fillable = [
         'operation_type_id',
+         'company_id',
         'total_heures',
         'salaire_total',
         'cout_total',
@@ -26,4 +28,12 @@ class RecapitulatifActivite extends Model
         'ccq_total',
         'total_general',
     ];
+     public function company()
+{
+    return $this->belongsTo(Company::class);
+}
+  public function operationType()
+{
+    return $this->belongsTo(OperationType::class, 'operation_type_id', 'id');
+}
 }

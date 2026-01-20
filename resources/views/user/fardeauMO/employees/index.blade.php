@@ -50,7 +50,61 @@
         }
         
     </style>
+ <style>
+  /* Conteneur qui centre verticalement et horizontalement */
+  .recap-section{
+    min-height: 55vh;                 /* hauteur suffisante pour le mettre "au milieu" visuellement */
+    display: flex;
+    align-items: center;               /* centre vertical */
+    justify-content: center;           /* centre horizontal */
+  }
+
+  /* Largeur contrôlée et responsive du bloc */
+  .recap-container{
+    width: 100%;
+    max-width: 820px;                  /* ↓ rétrécir ici (essaie 760–840px selon ton goût) */
+    margin: 0 auto;
+  }
+  @media (min-width: 1400px){
+    .recap-container{ max-width: 760px; } /* un poil plus étroit sur grands écrans */
+  }
+
+  /* Styles du bloc recap (restent comme avant) */
+  .recap-card{ background: transparent; border: 0; box-shadow: none; }
+  .recap-title{
+    background: #f3f2f7; padding: .6rem 1rem;
+    border: 1px solid #eee; border-bottom: 0;
+    border-radius: .5rem .5rem 0 0; font-weight: 600;
+  }
+  .recap-wrap{ border: 1px solid #eee; border-top: 0; border-radius: 0 0 .5rem .5rem; overflow: hidden; }
+  .recap-table{ margin-bottom: 0; }
+  .recap-table td{ padding: .35rem .6rem; }
+  .recap-table td:first-child{ text-align: left; }
+  .recap-table td:last-child{ text-align: right; width: 220px; }
+</style>
+<style>
+  /* Bloc blanc type "carte" */
+  .white-panel{
+    background:#fff;
+    border:1px solid #eee;
+    border-radius:14px;
+    box-shadow:0 2px 10px rgba(76,87,125,.08);
+    padding:16px 18px;
+    margin-bottom:18px;
+  }
+  .white-panel .table{ margin-bottom:0; }
+
+  /* Titre discret comme sur tes autres pages */
+  .panel-title{
+    font-weight:600;
+    font-size:1rem;
+    margin:2px 0 10px;
+  }
+</style>
+
+
 @endpush
+
 
 
 @section('content')
@@ -80,6 +134,7 @@
         @include('user.fardeauMO.partials.entete-table', ['entetes' => $entetes])
        <input type="hidden" name="jour_ferie" value="{{ $entetes->first()->jours_feries ?? 0 }}">
         {{-- 🟨 Employés --}}
+        <div class="white-panel">
         <div class="d-flex justify-content-end mb-2">
             <button id="addRowBtn" type="button" class="btn btn-primary btn-sm">
                 + 
@@ -88,9 +143,12 @@
                  Enregistrer tout
             </button>
              <input type="hidden" id="operationTypeId" value="{{ $operationTypeId }}">
+             <input type="hidden" id="isCCQ" value="{{ !empty($isCCQ) ? 1 : 0 }}">
         </div>
-        
+         </div>
 
+
+<div class="white-panel">
         <div class="table-responsive">
             <table id="employeeTable" class="table table-borderless text-center align-middle">
                 <thead class="thead-light">
@@ -113,9 +171,29 @@
  -->
                         <th>AE ($/h)</th>   <!-- AE=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";SI(Taux horaire corrigé*Taux de l'employé*Part de l'employeur*heures travaillée anuelement>Cotisation maximale AE de l'employeur ;Cotisation maximale AE de l'employeur /heures travaillée anuelement;Taux horaire corrigé*Taux de l'employé*Part de l'employeur)) -->
                         <th>RQAP ($/h)</th><!--RQAP=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";SI((Taux horaire corrigé*heures travaillée anuelement)>Salaire Max assurable RQAP;Cotisation maximale au RQAP/heures travaillée anuelement;(Taux horaire corrigé*heures travaillée anuelement)/heures travaillée anuelement*Taux Employeur RQAP(%))))-->
-                        <th>CSST ($/h)</th><!--CSST=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";Taux horaire corrigé*Taux CSST (%)))-->
-                        <th>FSSQ ($/h)</th><!--FSSQ=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";Taux horaire corrigé*Taux FSSQ (%)))-->
-                        <th>CNT ($/h)</th><!--CNT=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";SI((Taux horaire corrigé*heures travaillée anuelement)>Cotisation maximale au CNT ;Cotisation maximale au CNT /heures travaillée anuelement;(Taux horaire corrigé*Taux CNT (%)))))--> 
+                        {{-- CSST seulement en modèle standard --}}
+                        @unless((int)($isCCQ ?? 0) === 1)
+                        <th>CSST ($/h)</th>
+                         @endunless<!--CSST=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";Taux horaire corrigé*Taux CSST (%)))-->
+                         <th>FSSQ ($/h)</th><!--FSSQ=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";Taux horaire corrigé*Taux FSSQ (%)))-->
+                        {{-- 🔻 Colonnes CCQ insérées ENTRE FSSQ et CNT quand modèle CCQ --}}
+                          @if((int)($isCCQ ?? 0) === 1)
+                          <th class="col-ccq">Avantages Sociaux ($/h)</th>
+                          <th class="col-ccq">Taxes assurances($/h)</th>
+                          <th class="col-ccq">CCQ ($/h)</th>
+                          <th class="col-ccq">AECQ ($/h)</th>
+                          <th class="col-ccq">Fonds divers ($/h)</th>
+                          <th class="col-ccq">Équip. sécurité ($/h)</th>
+                          <th class="col-ccq">Clauses normatives ($/h)</th>
+                          @endif
+                         {{-- 🔺 Fin CCQ --}}
+                        
+                         {{-- CNT renommé en CNESST coté UI si CCQ (le name reste "cnt") --}}
+                          @if((int)($isCCQ ?? 0) === 1)
+                           <th>CNESST ($/h)</th>
+                           @else
+                           <th>CNT ($/h)</th>
+                          @endif <!--CNT=SI(Nom de l'employé="";"";SI(Taux horaire corrigé=0;"";SI((Taux horaire corrigé*heures travaillée anuelement)>Cotisation maximale au CNT ;Cotisation maximale au CNT /heures travaillée anuelement;(Taux horaire corrigé*Taux CNT (%)))))--> 
                         <th>Autres bénéfices avantages($)</th>
                         <th>Taux avant pauses ($/h)</th><!--Taux horaire corrigé+RRQ+AE+RQAP+CSST+FSSQ+CNT-->
                         <th>Coût annuel total ($)</th><!--Coût Annuel Total=SI(Nom de l'employé="";"";SI(Taux avant pauses, congés et temps mort="";"";(Taux avant pauses, congés et temps mort)*heures travaillée anuelement))-->
@@ -134,7 +212,8 @@
                 </thead>
                 <tbody id="tableBody">
                     @foreach($employees as $employee)
-                        @include('user.fardeauMO.partials.employee-row', ['employee' => $employee])
+                       @include('user.fardeauMO.partials.employee-row', ['employee' => $employee, 'isCCQ' => $isCCQ])
+
                     @endforeach
                 </tbody>
                 <tfoot>
@@ -157,22 +236,28 @@
     <td></td>                               <!-- 16 -->
     <td></td>                               <!-- 17 -->
     <td></td>                               <!-- 18 -->
-    <td></td>                               <!-- 19 -->
+    <td></td>                               <!-- 19-->
     <td></td>                               <!-- 20 -->
     <td></td>                               <!-- 21 -->
     <td></td>                               <!-- 22 -->
-    <td class="text-end" id="sum-total_annual_cost">0.00</td>    <!-- 23 -->
+    <td></td>                               <!-- 23 -->
     <td></td>                               <!-- 24 -->
-    <td></td>                               <!-- 25 -->
+    <td></td>    <!-- 25 -->
     <td></td>                               <!-- 26 -->
     <td></td>                               <!-- 27 -->
     <td></td>                               <!-- 28 -->
-    <td></td>                               <!-- 29 -->
+    <td class="text-end" id="sum-total_annual_cost">0.00</td>   <!-- 29 -->
     <td></td>                               <!-- 30 -->
     <td></td>                               <!-- 31 -->
     <td></td>                               <!-- 32 -->
     <td></td>                               <!-- 33 -->
-    <td></td>                               <!-- 34 (Actions) -->
+    <td></td>                               <!-- 34 -->
+    <td></td>                               <!-- 35 -->
+    <td></td>                               <!-- 36 -->
+    <td></td>                               <!-- 37 -->
+    <td></td>                               <!-- 38 -->
+    <td></td>                               <!-- 39 -->
+    <td></td>                               <!-- 40 (Actions) -->
   </tr>
 </tfoot>
 
@@ -205,9 +290,23 @@
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="rrq"></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="ae"></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="rqap"></td>
-    <td><input type="number" step="0.01" class="form-control form-control-sm" name="csst"></td>
+    @unless((int)($isCCQ ?? 0) === 1)
+     <td><input type="number" step="0.01" class="form-control form-control-sm" name="csst"></td>
+    @endunless
+
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="fssq"></td>
-    <td><input type="number" step="0.01" class="form-control form-control-sm" name="cnt"></td>
+
+    @if((int)($isCCQ ?? 0) === 1)
+    <td><input type="number" step="0.01" class="form-control form-control-sm" name="avantages_sociaux"></td>
+    <td><input type="number" step="0.01" class="form-control form-control-sm" name="taxes_assurance"></td>
+    <td><input type="number" step="0.01" class="form-control form-control-sm" name="ccq"></td>
+    <td><input type="number" step="0.01" class="form-control form-control-sm" name="aecq"></td>
+    <td><input type="number" step="0.01" class="form-control form-control-sm" name="fonds_divers"></td>
+    <td><input type="number" step="0.01" class="form-control form-control-sm" name="equipement_securite"></td>
+    <td><input type="number" step="0.01" class="form-control form-control-sm" name="clauses_normatives"></td>
+   @endif
+
+<td><input type="number" step="0.01" class="form-control form-control-sm" name="cnt"></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="other_benefits"></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="rate_before_downtime"></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="total_annual_cost"></td>
@@ -219,32 +318,67 @@
     <td><input type="number" step="0.1" class="form-control form-control-sm" name="productive_time_percentage"></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="rate_with_burden"></td>
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="burden_percentage"></td>
-    <td><input type="date" class="form-control form-control-sm" name="hire_date"></td>
+    
+    @php
+    // Si pour une raison X la valeur est une string ou "0000-00-00", on neutralise.
+    $hire = null;
+    try {
+        if ($employee->hire_date instanceof \Carbon\Carbon) {
+            $hire = $employee->hire_date;
+        } elseif (!empty($employee->hire_date) && $employee->hire_date !== '0000-00-00') {
+            $hire = \Carbon\Carbon::parse($employee->hire_date);
+        }
+    } catch (\Exception $e) {
+        $hire = null;
+    }
+@endphp
+
+<td>
+  <input type="date"
+         class="form-control form-control-sm"
+         name="hire_date"
+         value="{{ old('hire_date', optional($hire)->format('Y-m-d')) }}">
+</td>
+
     <td><input type="number" step="0.01" class="form-control form-control-sm" name="seniority"></td>
     <td>
-        <td>
+        
   <div class="d-flex justify-content-center gap-1">
     <button class="btn btn-danger btn-sm btn-delete-employee" title="Supprimer">
       <i class="fas fa-trash"></i>
     </button>
   </div>
-</td>
+
     </td>
         </tr>
     </template>
     </div>
 </div>
-<div class="card mt-3">
-  <div class="card-header"><strong>Récapitulatif</strong></div>
-  <div class="card-body">
-    <div class="row">
-      <div class="col-md-6">
-        <table class="table table-borderless mb-0">
+</div>
+
+<div class="white-panel">
+<div class="recap-section mt-3">
+  <div class="recap-container">
+    <div class="card recap-card"> 
+<div class="recap-title">Récapitulatif</div>
+ <div class="recap-wrap">
+    <div class="table-responsive">
+ 
+ 
+          <table class="table table-borderless text-end align-middle recap-table">
+
+        
           <tbody>
-            <tr><td>Heures travaillées</td><td class="text-end"><span id="recap-total_heures">0.00</span> h</td></tr>
+          <!--  <tr><td>Heures travaillées</td><td class="text-end"><span id="recap-total_heures">0.00</span> h</td></tr> --> 
             <tr><td><strong>Salaire annuel de base</strong></td><td class="text-end"><strong><span id="recap-salaire_total">0.00</span> $</strong></td></tr>
             <tr><td>Vacances payées</td><td class="text-end"><span id="recap-vacances_total">0.00</span> $</td></tr>
-            <tr><td>Avantages sociaux (autres $/h)</td><td class="text-end"><span id="recap-avantages_sociaux_total">0.00</span> $</td></tr>
+            <tr><td>Avantages sociaux (autres $/h)</td><td class="text-end"><span id="recap-avantages_sociaux_total">0.00</span> $</td></tr>`
+            @if((int)($isCCQ ?? 0) === 1)
+            <tr>
+            <td>CCQ </td>
+            <td class="text-end"><span id="recap-ccq_total">0.00</span> $</td>
+           </tr>
+           @endif
 
             <tr><td>RRQ</td><td class="text-end"><span id="recap-rrq_total">0.00</span> $</td></tr>
             <tr><td>AE</td><td class="text-end"><span id="recap-ae_total">0.00</span> $</td></tr>
@@ -252,6 +386,7 @@
             <tr><td>CNT</td><td class="text-end"><span id="recap-cnt_total">0.00</span> $</td></tr>
             <tr><td>FSSQ</td><td class="text-end"><span id="recap-fssq_total">0.00</span> $</td></tr>
             <tr><td>CSST</td><td class="text-end"><span id="recap-csst_total">0.00</span> $</td></tr>
+            
 
             <tr><td>Boni</td><td class="text-end"><span id="recap-boni_total">0.00</span> $</td></tr>
             <tr><td>Assurance Groupe</td><td class="text-end"><span id="recap-assurance_groupe_total">0.00</span> $</td></tr>
@@ -261,15 +396,17 @@
               <td class="text-end"><strong><span id="recap-total_general">0.00</span> $</strong></td>
             </tr>
 
-            <tr class="border-top">
+           <!-- <tr class="border-top">
               <td><strong>Coût annuel total (somme)</strong></td>
               <td class="text-end"><strong><span id="recap-cout_total">0.00</span> $</strong></td>
-            </tr>
+            </tr> -->
           </tbody>
         </table>
       </div>
+</div>
     </div>
   </div>
+</div>
 </div>
 
 @endsection
@@ -333,15 +470,28 @@
   // ====== Constantes venant du backend (OK) ======
   window.contributionRates = {
     rrq: {
-      rate: {{ $constants->rrq_rate_employee ?? 0 }}/100,
+      rate: {{ $constants->taux_de_cotisation_rrq ?? 0 }}/100,
       exemption: {{ $constants->rrq_exemption ?? 0 }},
       max: {{ $constants->rrq_max_salary ?? 0 }}
     },
-    ae:  { rate: {{ $constants->ae_rate_employer ?? 0 }}/100,  max: {{ $constants->ae_max_salary ?? 0 }} },
+    ae:  
+    { rate: {{ $constants->ae_rate_employer ?? 0 }}, 
+    rate_employee:{{ $constants->ae_rate_employee ?? 0 }}/100, 
+     max: {{ $constants->ae_max_salary ?? 0 }} ,
+    max_contrib_employer : {{ $constants->ae_max_employer ?? 0 }} },
+
     rqap:{ rate: {{ $constants->rqap_rate_employee ?? 0 }}/100, max: {{ $constants->rqap_max_salary ?? 0 }} },
     csst:{ rate: {{ $csstContribution?->csst_rate ?? 0 }}/100 },
     fssq:{ rate: {{ $constants->fss_rate ?? 0 }}/100 },
-    cnt: { rate: {{ $constants->cnt_rate ?? 0 }}/100, max: {{ $constants->cnt_max_salary ?? 0 }} }
+    
+    cnt: { 
+    rate: {{ $constants->cnt_rate ?? 0 }}/100,
+    max: {{ $constants->cnt_max_salary ?? 0 }} ,
+    max_contrib_employee:{{ $constants->cnt_max_contribution ?? 0 }} 
+  
+  },
+    
+    
   };
   window.constantsDebug = @json($constants);
   console.log('🔎 Constants from Laravel:', window.constantsDebug);
@@ -439,102 +589,134 @@
       else el.value = Number(v).toFixed(2);
     };
 
-    const gainsAnnuels = adjustedRate * hours;
+    
+// ===== Cotisations par heure (mêmes noms, formules corrigées) =====
+const A = adjustedRate;          // Taux horaire corrigé
+const H = hours;                 // Heures annuelles
+const G = A * H;                 // Gains annuels
 
-    // --- RRQ ($/h) ---
-    let rrq = null;
-    {
-      const cfg = contrib.rrq || { rate:0, exemption:0, max:0 };
-      const exemption = Number(cfg.exemption || 0);
-      const maxGains  = Number(cfg.max || 0);
-      const rate      = Number(cfg.rate || 0); // décimal
+// --- RRQ ($/h) ---
+let rrq = null;
+{
+  const cfg = contrib.rrq || { rate:0, exemption:0, max:0 };
+  const rate = Number(cfg.rate || 0);           // décimal
+  const ex   = Number(cfg.exemption || 0);
+  const max  = Number(cfg.max || 0);
 
-      if (adjustedRate > 0 && hours > 0) {
-        if (gainsAnnuels < exemption) {
-          rrq = null;
-        } else if (maxGains && gainsAnnuels > maxGains) {
-          const maxContr = Math.max(0, (maxGains - exemption) * rate);
-          rrq = maxContr / hours;
-        } else {
-          rrq = ((gainsAnnuels - exemption) / hours) * rate;
-        }
+  if (A > 0 && H > 0) {
+    if (G < ex) {
+      rrq = null;                                // ""
+    } else if (max && G > max) {
+      rrq = ((max - ex) * rate) / H;            // cotisation max / H
+    } else {
+      rrq = ((G - ex) * rate) / H;              // ((G - ex)/H) * rate
+    }
+  }
+}
+set4('rrq', rrq);
+
+// --- AE ($/h) ---
+let ae = null;
+{
+  const cfg = contrib.ae || { rate:0, max:0 };
+  const rate = Number(cfg.rate || 0);           // taux employeur
+  const rate_employee = Number(cfg.rate_employee || 0); // taux employee
+  const max  = Number(cfg.max || 0);
+  const max_contrib_employer = Number(cfg.max_contrib_employer || 0);
+
+const ann = A *rate_employee* rate * H; 
+  if (A > 0 && H > 0) {
+    if (ann>max_contrib_employer ) {
+    ae=max_contrib_employer/H;  
+    }else{
+      ae=A*rate*rate_employee;
       }
-      set4('rrq', rrq);
-    }
+    
+  }
+}
+set4('ae', ae);
 
-    // --- AE ($/h) ---
-    // on utilise le taux employeur disponible et on plafonne via max salaire (si fourni)
-    let ae = null;
-    {
-      const cfg = contrib.ae || { rate:0, max:0 };
-      const rate = Number(cfg.rate || 0);
-      const maxSalary = Number(cfg.max || 0);       // salaire max assurable
-      if (adjustedRate > 0 && hours > 0) {
-        const annTheorique = adjustedRate * rate * hours;           // contribution annuelle théorique
-        const annPlafond   = maxSalary ? (rate * maxSalary) : Infinity; // cotisation max annuelle (si on a max salaire)
-        const annRetenue   = Math.min(annTheorique, annPlafond);
-        ae = annRetenue / hours;
-      }
-      set4('ae', ae);
-    }
+// --- RQAP ($/h) ---
+let rqap = null;
+{
+  const cfg = contrib.rqap || { rate:0, max:0 };
+  const rate = Number(cfg.rate || 0);           // taux employeur
+  const max  = Number(cfg.max || 0);
 
-    // --- RQAP ($/h) ---
-    let rqap = null;
-    {
-      const cfg = contrib.rqap || { rate:0, max:0 };
-      const rate = Number(cfg.rate || 0);          // si tu as un taux employeur séparé, remplace ici
-      const maxSalary = Number(cfg.max || 0);
-      if (adjustedRate > 0 && hours > 0) {
-        if (maxSalary && gainsAnnuels > maxSalary) {
-          const annMax = rate * maxSalary;         // cotisation max annuelle
-          rqap = annMax / hours;
-        } else {
-          rqap = adjustedRate * rate;              // base par heure
-        }
-      }
-      set4('rqap', rqap);
-    }
+  if (A > 0 && H > 0) {
+    rqap = (max && G > max) ? (rate * max) / H  // cotisation max / H
+                            : A * rate;         // (G/H)*rate
+  }
+}
+set4('rqap', rqap);
 
-    // --- CSST ($/h) ---
-    let csst = null;
-    {
-      const cfg = contrib.csst || { rate:0 };
-      const rate = Number(cfg.rate || 0);
-      if (adjustedRate > 0) csst = adjustedRate * rate;
-      set4('csst', csst);
-    }
+// --- CSST ($/h) ---
+let csst = null;
+{
+  if (A > 0) {
+    const cfg = contrib.csst || { rate:0 };
+    const rate = Number(cfg.rate || 0);
+    csst = A * rate;
+  }
+}
+set4('csst', csst);
 
-    // --- FSSQ ($/h) ---
-    let fssq = null;
-    {
-      const cfg = contrib.fssq || { rate:0 };
-      const rate = Number(cfg.rate || 0);
-      if (adjustedRate > 0) fssq = adjustedRate * rate;
-      set4('fssq', fssq);
-    }
+// --- FSSQ ($/h) ---
+let fssq = null;
+{
+  const cfg = contrib.fssq || { rate:0 };
+  const rate = Number(cfg.rate || 0);
+  if (A > 0) fssq = A * rate;
+}
+set4('fssq', fssq);
 
-    // --- CNT ($/h) ---
-    let cnt = null;
-    {
-      const cfg = contrib.cnt || { rate:0, max:0 };
-      const rate = Number(cfg.rate || 0);
-      const maxSalary = Number(cfg.max || 0);   // salaire max assurable CNT
-      if (adjustedRate > 0 && hours > 0) {
-        if (maxSalary && gainsAnnuels > maxSalary) {
-          const annMax = rate * maxSalary;      // cotisation max annuelle (si on n'a que salaire max et taux)
-          cnt = annMax / hours;
-        } else {
-          cnt = adjustedRate * rate;            // base horaire
-        }
-      }
-      set4('cnt', cnt);
-    }
+// --- CNT ($/h) ---
+// --- CNT ($/h) ---
+let cnt = null;
+{
+  const rate      = Number((contrib.cnt?.rate) || 0);
+const max = Number((contrib.cnt?.max)  || 0);  // <= salaire max
+const max_contrib_employee =Number((contrib.cnt?.max_contrib_employee)  || 0);
 
-    // 7) Taux avant pauses
-    const rateBeforeDowntime =
-      adjustedRate +
-      (rrq || 0) + (get('ae') || 0) + (get('rqap') || 0) + (get('csst') || 0) + (get('fssq') || 0) + (get('cnt') || 0);
-    set('rate_before_downtime', rateBeforeDowntime);
+
+  if (A > 0 && H > 0) {
+  
+    if (G > max_contrib_employee) {
+      // plafond: (taux * salaire max) / heures = $/h
+      cnt = max_contrib_employee / H;
+    } else {
+      // sinon: taux * taux horaire corrigé = $/h
+      cnt = A * rate;
+    }
+  } else {
+    cnt = null; // champ vide si pas de données
+  }
+}
+set4('cnt', cnt);
+
+// --- Taux avant pauses (somme des variables locales) ---
+// Somme des colonnes CCQ ($/h) si on est en mode CCQ
+const ccqExtras = window.isCCQ
+  ? (
+      get('avantages_sociaux') +
+      get('taxes_assurance') +
+      get('ccq') +
+      get('aecq') +
+      get('fonds_divers') +
+      get('equipement_securite') +
+      get('clauses_normatives')
+    )
+  : 0;
+
+// Base commune (sans CSST si CCQ car la colonne n’existe pas en CCQ)
+const baseBefore =
+  A + (rrq || 0) + (ae || 0) + (rqap || 0) + (fssq || 0) + (cnt || 0) 
+
+// En CCQ on ajoute simplement toutes les colonnes CCQ
+const rateBeforeDowntime = baseBefore + ccqExtras;
+
+set('rate_before_downtime', rateBeforeDowntime);
+
 
     // 8) Coût annuel total
     set('total_annual_cost', rateBeforeDowntime * hours);
@@ -559,7 +741,8 @@
 
     // 11) Fardeau (%)
     const baseForBurden = hourlyRate + dividendHourly;
-    const burdenPercentage = baseForBurden > 0 ? ((rateWithBurden / baseForBurden) - 1) * 100 : 0;
+    
+    const burdenPercentage =(rateWithBurden/(adjustedRate+(dividends /hours))-1)*100;
     set('burden_percentage', burdenPercentage);
 
     // 12) Ancienneté
@@ -585,7 +768,11 @@
     });
   });
 </script>
-
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    window.isCCQ = (document.getElementById('isCCQ')?.value === '1');
+  });
+</script>
 <script>
   // ====== Ajout de ligne (ordre corrigé, pas de pré-remplissage qui écrase) ======
   document.getElementById('addRowBtn').addEventListener('click', () => {
@@ -665,73 +852,133 @@ document.addEventListener('click', async e => {
         }
     });
   // ====== Récap & totaux (inchangé) ======
-  (function(){
-    const table = document.getElementById('employeeTable');
-    const tbody = table?.querySelector('tbody');
+(function(){
+  const table = document.getElementById('employeeTable');
+  const tbody = table?.querySelector('tbody');
 
-    function num(v){ const n = parseFloat(String(v).replace(',','.')); return isNaN(n) ? 0 : n; }
-    function fmt(n){ return Number(n).toFixed(2); }
-    function sumInputsByName(name){
-      let s = 0;
-      tbody?.querySelectorAll(`tr [name="${name}"]`).forEach(inp => { s += num(inp.value); });
-      return s;
-    }
+  function num(v){ const n = parseFloat(String(v).replace(',','.')); return isNaN(n) ? 0 : n; }
+  function fmt(n){ return Number(n).toFixed(2); }
 
-    function recalcTotalsUI(){
-      if (!tbody) return;
-      const sHours = sumInputsByName('hours_worked_annual');
-      const sSal   = sumInputsByName('annual_salary');
-      const sCost  = sumInputsByName('total_annual_cost');
+  // Somme simple d’une colonne (valeurs brutes du champ)
+  function sumInputsByName(name){
+    let s = 0;
+    tbody?.querySelectorAll(`tr [name="${name}"]`).forEach(inp => { s += num(inp.value); });
+    return s;
+  }
 
-      const elH = document.getElementById('sum-hours_worked_annual');
-      const elS = document.getElementById('sum-annual_salary');
-      const elC = document.getElementById('sum-total_annual_cost');
-      if (elH) elH.textContent = fmt(sHours);
-      if (elS) elS.textContent = fmt(sSal);
-      if (elC) elC.textContent = fmt(sCost);
-
-      const recap = {
-        total_heures: sHours,
-        salaire_total: sSal,
-        cout_total: sCost,
-
-        vacances_total: sumInputsByName('paid_vacation'),
-        avantages_sociaux_total: sumInputsByName('other_benefits_hourly'),
-
-        rrq_total: sumInputsByName('rrq'),
-        ae_total: sumInputsByName('ae'),
-        rqap_total: sumInputsByName('rqap'),
-        cnt_total: sumInputsByName('cnt'),
-        fssq_total: sumInputsByName('fssq'),
-        csst_total: sumInputsByName('csst'),
-
-        boni_total: sumInputsByName('bonus'),
-        assurance_groupe_total: sumInputsByName('group_insurance'),
-      };
-
-      recap.total_general =
-        recap.salaire_total +
-        recap.vacances_total +
-        recap.avantages_sociaux_total +
-        recap.boni_total +
-        recap.assurance_groupe_total;
-
-      [
-        'total_heures','salaire_total','cout_total',
-        'vacances_total','avantages_sociaux_total',
-        'rrq_total','ae_total','rqap_total','cnt_total','fssq_total','csst_total',
-        'boni_total','assurance_groupe_total','total_general'
-      ].forEach(k => {
-        const el = document.getElementById('recap-' + k);
-        if (el) el.textContent = fmt(recap[k] || 0);
-      });
-    }
-
-    document.addEventListener('input', (e) => {
-      if (e.target.closest('#employeeTable')) recalcTotalsUI();
+  // Somme annuelle: Σ( valeur $/h * heures )
+  function sumAnnualByName(namePerHour){
+    let s = 0;
+    tbody?.querySelectorAll('tr').forEach(tr => {
+      const h = num(tr.querySelector('[name="hours_worked_annual"]')?.value);
+      const v = num(tr.querySelector(`[name="${namePerHour}"]`)?.value);
+      s += h * v;
     });
-    document.addEventListener('DOMContentLoaded', recalcTotalsUI);
-  })();
+    return s;
+  }
+
+  function recalcTotalsUI(){
+    if (!tbody) return;
+const IS_CCQ = document.getElementById('isCCQ')?.value === '1';
+    // Totaux “simples”
+    const sHours = sumInputsByName('hours_worked_annual');     // heures
+    const sSal   = sumInputsByName('annual_salary');           // $ (déjà annuel)
+    const sCost  = sumInputsByName('total_annual_cost');       // $ (déjà annuel)
+// CCQ total (hors "avantages_sociaux")
+    let ccq_total = 0;
+    if (IS_CCQ) {
+      ccq_total =
+        sumAnnualByName('taxes_assurance') +
+        sumAnnualByName('ccq') +
+        sumAnnualByName('aecq') +
+        sumAnnualByName('fonds_divers') +
+        sumAnnualByName('equipement_securite') +
+        sumAnnualByName('clauses_normatives');
+    }
+    // Totaux $/h -> $ annuels
+    const rrq_total   = sumAnnualByName('rrq');
+    const ae_total    = sumAnnualByName('ae');
+    const rqap_total  = sumAnnualByName('rqap');
+    const cnt_total   = sumAnnualByName('cnt');
+    const fssq_total  = sumAnnualByName('fssq');
+    const csst_total  = sumAnnualByName('csst'); // 0 si colonne absente
+
+    // Vacances ($/h -> $ annuels) + Congé payé ($/h -> $ annuels)
+    const vacances_total    = sumAnnualByName('paid_vacation');
+    const conge_paye_total  = sumAnnualByName('paid_leave');
+
+    // 🔁 NOUVELLE DÉFINITION: Avantages Sociaux (ADMIN)
+    // = SOMMEPROD(M:C) + SOMME(G36:G40)
+    // => congé payé + RRQ + AE + RQAP + CNT + FSSQ (+ CSST si pas CCQ)
+  let avantages_sociaux_total;
+
+if (!window.isCCQ) {
+  // MODE STANDARD
+  // = congé payé + RRQ + AE + RQAP + CNT + FSSQ (+ CSST si tu l’inclus côté standard)
+  avantages_sociaux_total =
+      conge_paye_total
+    + rrq_total
+    + ae_total
+    + rqap_total
+    + cnt_total
+    + fssq_total; // ← retire cette ligne si tu ne veux pas CSST dans ce total
+} else {
+  // MODE CCQ
+  // = SOMMEPROD(colonne "avantages_sociaux" CCQ ; heures)
+  avantages_sociaux_total = sumAnnualByName('avantages_sociaux'); // ⚠️ sans espace !
+}
+
+    // Déjà annuels par ligne
+    const boni_total             = sumInputsByName('bonus');
+    const assurance_groupe_total = sumInputsByName('group_insurance');
+
+    // Écrire dans le footer
+    const elH = document.getElementById('sum-hours_worked_annual');
+    const elS = document.getElementById('sum-annual_salary');
+    const elC = document.getElementById('sum-total_annual_cost');
+    if (elH) elH.textContent = fmt(sHours);
+    if (elS) elS.textContent = fmt(sSal);
+    if (elC) elC.textContent = fmt(sCost);
+
+    // Récap (en $ annuels)
+    const total_general =
+        sSal +
+        vacances_total +
+        avantages_sociaux_total +
+        boni_total +
+        assurance_groupe_total+ccq_total;
+
+    const recapMap = {
+      total_heures: sHours,
+      salaire_total: sSal,
+      cout_total: sCost,
+
+      vacances_total,
+      avantages_sociaux_total,   // ⬅️ mis à jour
+      rrq_total,
+      ae_total,
+      rqap_total,
+      cnt_total,
+      fssq_total,
+      csst_total,
+      ccq_total,
+  
+      boni_total,
+      assurance_groupe_total,
+      total_general
+    };
+
+    Object.entries(recapMap).forEach(([k,v])=>{
+      const el = document.getElementById('recap-' + k);
+      if (el) el.textContent = fmt(v || 0);
+    });
+  }
+
+  document.addEventListener('input', (e) => {
+    if (e.target.closest('#employeeTable')) recalcTotalsUI();
+  });
+  document.addEventListener('DOMContentLoaded', recalcTotalsUI);
+})();
 
   document.addEventListener('DOMContentLoaded', () => {
 
@@ -877,6 +1124,59 @@ document.addEventListener('click', async e => {
   })();
 
 </script>
+<script>
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-delete-employee');
+  if (!btn) return;
+
+  const tr  = btn.closest('tr');
+  const id  = btn.dataset.id || tr?.dataset.id || null;
+  const url = btn.dataset.url || (id ? "{{ route('user.fardeauMO.employees.destroy', ':id') }}".replace(':id', id) : null);
+
+  // Si pas d'ID -> ligne jamais enregistrée => on supprime juste dans l'UI
+  if (!id || !url) {
+    if (confirm('Supprimer cette ligne non enregistrée ?')) {
+      tr?.remove();
+      // Forcer recalcul des totaux
+      const first = document.querySelector('#employeeTable tbody input');
+      if (first) first.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    return;
+  }
+
+  if (!confirm('Supprimer définitivement cet employé ?')) return;
+
+  try {
+    const res = await fetch(url, {
+      method: 'DELETE', // attend une route DELETE
+      headers: {
+        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      }
+    });
+
+    let data;
+    try { data = await res.json(); } catch { data = {}; }
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Suppression impossible');
+    }
+
+    // OK: on enlève la ligne et on recalcule l’UI
+    tr?.remove();
+    const first = document.querySelector('#employeeTable tbody input');
+    if (first) first.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // optionnel: toast/alert
+    // alert(data.success || 'Employé supprimé avec succès');
+  } catch (err) {
+    console.error(err);
+    alert('❌ Erreur de suppression : ' + err.message);
+  }
+});
+</script>
+
 @endpush
 
 

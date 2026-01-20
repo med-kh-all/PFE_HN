@@ -1,3 +1,4 @@
+<div class="white-panel">
 <div class="table-responsive">
     <table id="enteteTable" class="table table text-center align-middle">
         <thead class="thead-light">
@@ -56,4 +57,5 @@
             </tr>
         </tfoot>
     </table>
+</div>
 </div>

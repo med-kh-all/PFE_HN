@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\User\RecapitulatifActiviteController;
 use App\Models\Contribution;
 use App\Models\Employees;
+use App\Models\EmployeeCCQ;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Carbon\Carbon;
@@ -17,58 +18,72 @@ use Illuminate\Support\Facades\DB;
 class EmployeeController extends Controller
 {
     public function index(Request $request)
-    {
-        $operationTypeId = $request->query('type');
+{
+    $operationTypeId = $request->query('type');
 
-        if (!$operationTypeId) {
-            return redirect()->back()->with('error', 'Paramètre "type" manquant dans l’URL.');
-        }
-
-        if ($request->ajax()) {
-            $employees = Employees::with('operationType')
-                ->where('operation_type_id', $operationTypeId)
-                ->get();
-
-            return DataTables::of($employees)
-                ->addColumn('action', function ($employee) {
-                    // ✅ Seulement supprimer (plus d’édition)
-                    return '
-                        <div class="d-flex justify-content-center gap-2">
-                            <button class="btn btn-sm btn-delete" data-id="' . $employee->id . '">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    ';
-                })
-                ->rawColumns(['action'])
-                ->make(true);
-        }
-
-        $constants = Contribution::whereNull('company_id')->orderByDesc('year')->first();
-        if (!$constants) {
-            abort(500, 'Les contributions globales ne sont pas définies.');
-        }
-
-        $company = auth()->user()->companies()->first();
-        $csstContribution = null;
-
-        if ($company) {
-            $csstContribution = Contribution::where('company_id', $company->id)
-                                            ->whereNotNull('csst_rate')
-                                            ->orderByDesc('year')
-                                            ->first();
-        }
-
-        return view('user.fardeauMO.employees.index', [
-            'employees'        => Employees::where('operation_type_id', $operationTypeId)->get(),
-            'entetes'          => EnteteActivite::where('operation_type_id', $operationTypeId)->get(),
-            'operationTypes'   => OperationType::all(),
-            'constants'        => $constants,
-            'csstContribution' => $csstContribution,
-            'operationTypeId'  => $operationTypeId,
-            'users'            => User::select('id','name','email')->orderBy('name')->get(),
-        ]);
+    if (!$operationTypeId) {
+        return redirect()->back()->with('error', 'Paramètre "type" manquant dans l’URL.');
     }
+
+    // ➜ Récupérer le type et le flag CCQ
+    $type  = OperationType::findOrFail($operationTypeId);
+    $isCCQ = (bool) $type->is_ccq;
+
+    // Ajax DataTable (si tu l’utilises) — pas obligatoire de renvoyer ccq ici
+    if ($request->ajax()) {
+        $employees = Employees::with(['operationType']) // tu peux ajouter 'ccq' si tu affiches des champs ccq en ajax
+            ->where('operation_type_id', $operationTypeId)
+            ->get();
+
+        return DataTables::of($employees)
+            ->addColumn('action', function ($employee) {
+                return '
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-sm btn-delete" data-id="' . $employee->id . '">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                ';
+            })
+            ->rawColumns(['action'])
+            ->make(true);
+    }
+
+    // Constantes
+    $constants = Contribution::whereNull('company_id')->orderByDesc('year')->first();
+    if (!$constants) {
+        abort(500, 'Les contributions globales ne sont pas définies.');
+    }
+
+    $company = auth()->user()->companies()->first();
+    $csstContribution = null;
+    if ($company) {
+        $csstContribution = Contribution::where('company_id', $company->id)
+            ->whereNotNull('csst_rate')
+            ->orderByDesc('year')
+            ->first();
+    }
+
+    // ➜ IMPORTANT: charger la relation ccq pour la vue
+    $employees = Employees::with('ccq')
+        ->where('operation_type_id', $operationTypeId)
+        ->get();
+
+    return view('user.fardeauMO.employees.index', [
+        'employees'        => $employees,
+        'entetes'          => EnteteActivite::where('operation_type_id', $operationTypeId)->get(),
+        'operationTypes'   => OperationType::all(),
+        'constants'        => $constants,
+        'csstContribution' => $csstContribution,
+        'operationTypeId'  => $operationTypeId,
+        'users'            => User::select('id','name','email')->orderBy('name')->get(),
+
+        // ➜ on envoie aussi le type et le flag CCQ
+        'isCCQ'            => $isCCQ,
+        'operationType'    => $type,
+    ]);
+}
+
 
     public function store(Request $request)
     {
@@ -93,14 +108,33 @@ class EmployeeController extends Controller
             if (!$request->filled('operation_type_id')) {
                 $validated['operation_type_id'] = (int) $request->query('type');
             }
+ // On conserve une copie pour CCQ AVANT de nettoyer
+        $ccqKeys = [
+            'avantages_sociaux','taxes_assurance',
+            'ccq','aecq','fonds_divers','equipement_securite','clauses_normatives',
+            'total_cout_horaire','cout_annuel_total',
+        ];
+        $ccqData = array_intersect_key($request->all(), array_flip($ccqKeys));
 
-            // Nettoyage des champs non présents en DB
+// Nettoyage des champs non présents en DB
             unset($validated['user_id'], $validated['breaks_percent'], $validated['idle_percent'], $validated['id'], $validated['annual_salary']);
 
             $employee = Employees::updateOrCreate(
                 ['id' => $request->id ?? null],
                 $validated
             );
+
+             // ➜ Si le type est CCQ, persister dans employee_ccq
+        $opType = OperationType::findOrFail($validated['operation_type_id']);
+        if ($opType->is_ccq) {
+            $employee->ccq()->updateOrCreate(
+                ['employee_id' => $employee->id],
+                $ccqData
+            );
+        } else {
+            // Si on repasse en standard, on supprime la ligne CCQ
+            $employee->ccq()?->delete();
+        }
 
             $recapResponse = app(RecapitulatifActiviteController::class)
                 ->recompute(new Request(['type' => $validated['operation_type_id']]));
@@ -152,44 +186,68 @@ class EmployeeController extends Controller
             'rows.*.breaks_percent' => 'nullable|numeric|min:0',
             'rows.*.idle_percent' => 'nullable|numeric|min:0',
             'rows.*.hire_date' => 'nullable|date',
+             // ⬇️ CCQ
+            'rows.*.avantages_sociaux'   => 'nullable|numeric|min:0',
+            'rows.*.taxes_assurance'     => 'nullable|numeric|min:0',
+            'rows.*.ccq'                 => 'nullable|numeric|min:0',
+            'rows.*.aecq'                => 'nullable|numeric|min:0',
+            'rows.*.fonds_divers'        => 'nullable|numeric|min:0',
+            'rows.*.equipement_securite' => 'nullable|numeric|min:0',
+            'rows.*.clauses_normatives'  => 'nullable|numeric|min:0',
+            'rows.*.total_cout_horaire'  => 'nullable|numeric|min:0',
+            'rows.*.cout_annuel_total'   => 'nullable|numeric|min:0',
         ]);
 
         $operationTypeId = (int) $data['operation_type_id'];
-        $rows = $data['rows'];
+$rows = $data['rows'];
+$isCCQ = (bool) OperationType::findOrFail($operationTypeId)->is_ccq;
 
-        DB::transaction(function () use ($rows, $operationTypeId) {
-            foreach ($rows as $row) {
-                $row['operation_type_id'] = $operationTypeId;
+DB::transaction(function () use ($rows, $operationTypeId, $isCCQ) {
+    foreach ($rows as $row) {
+        $row['operation_type_id'] = $operationTypeId;
 
-                // (facultatif) lookup User, mais NE PAS persister user_id (colonne absente)
-                // if (!empty($row['employee_name'])) {
-                //     $text = trim($row['employee_name']);
-                //     $user = User::where('name', $text)->orWhere('email', $text)->first();
-                //     $row['user_id'] = $user?->id; // ❌ colonne absente
-                // }
+        $row += [
+            'non_taxable_dividends' => $row['non_taxable_dividends'] ?? 0,
+            'breaks_percent'        => $row['breaks_percent'] ?? null,
+            'idle_percent'          => $row['idle_percent'] ?? null,
+        ];
 
-                $row += [
-                    'non_taxable_dividends' => $row['non_taxable_dividends'] ?? 0,
-                    'breaks_percent'        => $row['breaks_percent'] ?? null,
-                    'idle_percent'          => $row['idle_percent'] ?? null,
-                ];
+        // ➜ extraire les champs CCQ pour éviter de les insérer dans 'employees'
+        $ccqKeys = [
+            'avantages_sociaux','taxes_assurance',
+            'ccq','aecq','fonds_divers','equipement_securite','clauses_normatives',
+            'total_cout_horaire','cout_annuel_total',
+        ];
+        $ccqData = array_intersect_key($row, array_flip($ccqKeys));
+        foreach ($ccqKeys as $k) unset($row[$k]); // on enlève du payload employé
 
-                $this->calculateEmployeeCosts($row);
+        // calculs employés
+        $this->calculateEmployeeCosts($row);
 
-                // Nettoyage avant persistance
-                unset($row['user_id'], $row['breaks_percent'], $row['idle_percent'], $row['annual_salary']);
+        unset($row['user_id'], $row['breaks_percent'], $row['idle_percent'], $row['annual_salary']);
 
-                if (!empty($row['id'])) {
-                    $id = (int) $row['id'];
-                    unset($row['id']); // ⚠️ ne pas SET id=...
-                    Employees::where('id', $id)->update($row);
-                } else {
-                    unset($row['id']);
-                    Employees::create($row);
-                }
-            }
-        });
+        // upsert employé
+        if (!empty($row['id'])) {
+            $id = (int)$row['id'];
+            unset($row['id']);
+            Employees::where('id', $id)->update($row);
+            $employeeId = $id;
+        } else {
+            unset($row['id']);
+            $employeeId = Employees::create($row)->id;
+        }
 
+        // upsert CCQ si applicable
+        if ($isCCQ) {
+            EmployeeCCQ::updateOrCreate(
+                ['employee_id' => $employeeId],
+                $ccqData
+            );
+        } else {
+            EmployeeCCQ::where('employee_id', $employeeId)->delete();
+        }
+    }
+});
         $recapResponse = app(RecapitulatifActiviteController::class)
             ->recompute(new Request(['type' => $operationTypeId]));
         $recap = json_decode($recapResponse->getContent(), true);
@@ -238,7 +296,14 @@ class EmployeeController extends Controller
         $validated['idle_percent']   = $validated['idle_percent']   ?? ($entete->pourcentage_temps_mort ?? 0);
 
         $contrib = Contribution::first();
-        $rates   = $this->initializeContributionRates($contrib);
+        $company = auth()->user()->companies()->first();
+$csstRate = 0.0;
+if ($company) {
+    $csstRow  = Contribution::where('company_id', $company->id)
+                ->whereNotNull('csst_rate')->orderByDesc('year')->first();
+    $csstRate = (($csstRow->csst_rate ?? 0) / 100);
+}
+$rates = $this->initializeContributionRates($contrib, $csstRate);
 
         $hours = (float) ($validated['hours_worked_annual'] ?? 0);
         $rate  = (float) ($validated['hourly_rate'] ?? 0);
@@ -291,31 +356,42 @@ class EmployeeController extends Controller
     }
 
 
-    protected function initializeContributionRates($contrib)
-    {
-        return [
-            'rrq' => [
-                'employee_rate' => (($contrib->rrq_rate_employee ?? 0) / 100),
-                'max_salary'    => ($contrib->rrq_max_salary ?? 0),
-                'exemption'     => ($contrib->rrq_exemption ?? 0),
-            ],
-            'ae' => [
-                'employer_rate' => (($contrib->ae_rate_employer ?? 0) / 100),
-                'max_salary'    => ($contrib->ae_max_salary ?? 0),
-            ],
-            'rqap' => [
-                'employer_rate' => (($contrib->rqap_rate_employer ?? 0) / 100),
-                'max_salary'    => ($contrib->rqap_max_salary ?? 0),
-            ],
-            'cnt' => [
-                'rate'       => (($contrib->cnt_rate ?? 0) / 100),
-                'max_salary' => ($contrib->cnt_max_salary ?? 0),
-            ],
-            'fssq' => [
-                'rate' => (($contrib->fss_rate ?? 0) / 100),
-            ],
-        ];
-    }
+   protected function initializeContributionRates($contrib, float $csstRate = 0.0)
+{
+    return [
+        'rrq' => [
+            'employee_rate' => (($contrib->taux_de_cotisation_rrq ?? 0) / 100),
+            'max_salary'    => ($contrib->rrq_max_salary ?? 0),
+            'exemption'     => ($contrib->rrq_exemption ?? 0),
+        ],
+        'ae' => [
+            'employer_rate' => (($contrib->ae_rate_employer ?? 0)),
+            'employee_rate' => (($contrib->ae_rate_employee ?? 0) / 100),
+            'max_salary'    => ($contrib->ae_max_salary ?? 0),
+            'max_contrib_employer'   => ($contrib->ae_max_employer ?? 0),
+            
+
+        ],
+        'rqap' => [
+            'employer_rate' => (($contrib->rqap_rate_employee ?? 0) / 100),
+            'max_salary'    => ($contrib->rqap_max_salary ?? 0),
+        ],
+        'cnt' => [
+            'rate'       => (($contrib->cnt_rate ?? 0) / 100),
+            'max_salary' => ($contrib->cnt_max_salary ?? 0),
+            'max_contrib_employee'=> ($contrib->cnt_max_contribution ?? 0),
+
+        ],
+        
+        'fssq' => [
+            'rate' => (($contrib->fss_rate ?? 0) / 100),
+        ],
+        'csst' => [
+            'rate' => $csstRate, // 0 si CCQ
+        ],
+    ];
+}
+
 
     /**
      * @param array $rates           // barèmes Contribution
@@ -323,50 +399,84 @@ class EmployeeController extends Controller
      * @param float $hours           // heures annuelles
      * @return array
      */
-    protected function calculateContributions($rates, $adjustedRate, $hours)
-    {
-        $baseSalary = $adjustedRate * $hours; // $ total
+   protected function calculateContributions($rates, $adjustedRate, $hours)
+{
+    $A = (float)$adjustedRate;         // Taux horaire corrigé
+    $H = max(0.0, (float)$hours);      // Heures/an
+    $G = $A * $H;                      // Gains annuels
 
-        // RRQ (ramené en $/h)
-        $rrqValue = 0;
-        if ($baseSalary > $rates['rrq']['exemption']) {
-            $rrqMaxGains = $rates['rrq']['max_salary'] - $rates['rrq']['exemption'];
-            $rrqValue = ($baseSalary >= $rates['rrq']['max_salary'])
-                ? ($rrqMaxGains * $rates['rrq']['employee_rate']) / $hours
-                : (($baseSalary - $rates['rrq']['exemption']) / $hours) * $rates['rrq']['employee_rate'];
+    // RRQ ($/h)
+    $rrqValue = 0.0;
+    if ($A > 0 && $H > 0) {
+        $ex  = $rates['rrq']['exemption'];
+        $max = $rates['rrq']['max_salary'];
+        $r   = $rates['rrq']['employee_rate'];
+        if ($G < $ex) {
+            $rrqValue = 0.0;                                // ""
+        } elseif ($max && $G > $max) {
+            $rrqValue = (($max - $ex) * $r) / $H;           // cotisation max / H
+        } else {
+            $rrqValue = (($G - $ex) * $r) / $H;             // ((G - ex)/H) * r
         }
-
-        // AE ($/h)
-        $aeValue = ($baseSalary >= $rates['ae']['max_salary'])
-            ? ($rates['ae']['max_salary'] * $rates['ae']['employer_rate']) / $hours
-            : $adjustedRate * $rates['ae']['employer_rate'];
-
-        // RQAP ($/h)
-        $rqapValue = ($baseSalary >= $rates['rqap']['max_salary'])
-            ? ($rates['rqap']['max_salary'] * $rates['rqap']['employer_rate']) / $hours
-            : $adjustedRate * $rates['rqap']['employer_rate'];
-
-        // CNT ($/h)
-        $cntValue = ($baseSalary >= $rates['cnt']['max_salary'])
-            ? ($rates['cnt']['max_salary'] * $rates['cnt']['rate']) / $hours
-            : $adjustedRate * $rates['cnt']['rate'];
-
-        // FSSQ ($/h)
-        $fssqValue = $adjustedRate * $rates['fssq']['rate'];
-
-        // Taux avant temps morts ( $/h )
-        $rateBeforeDowntime = $adjustedRate + $rrqValue + $aeValue + $rqapValue + $cntValue + $fssqValue;
-
-        return [
-            'rrq'                  => $rrqValue,
-            'ae'                   => $aeValue,
-            'rqap'                 => $rqapValue,
-            'cnt'                  => $cntValue,
-            'fssq'                 => $fssqValue,
-            'rate_before_downtime' => $rateBeforeDowntime,
-            'total_annual_cost'    => $rateBeforeDowntime * $hours, // $ total annuel
-        ];
     }
+
+    // AE ($/h) - employeur
+    $aeValue = 0.0;
+    if ($A > 0 && $H > 0) {
+        $r   = $rates['ae']['employer_rate'];
+        $max = $rates['ae']['max_salary'];
+        $ann = $A * $r * $H;
+        $cap = $max ? ($r * $max) : INF;
+        $aeValue = min($ann, $cap) / $H;
+    }
+
+    // RQAP ($/h) - employeur
+    $rqapValue = 0.0;
+    if ($A > 0 && $H > 0) {
+        $r   = $rates['rqap']['employer_rate'];
+        $max = $rates['rqap']['max_salary'];
+        $rqapValue = ($max && $G > $max) ? ($r * $max) / $H : $A * $r;
+    }
+
+    // CSST ($/h) - 0 si CCQ
+    $csstValue = ($A > 0) ? ($A * ($rates['csst']['rate'] ?? 0)) : 0.0;
+
+    // FSSQ ($/h)
+    $fssqValue = ($A > 0) ? ($A * $rates['fssq']['rate']) : 0.0;
+
+    // --- CNT ($/h)
+$cntValue = null;
+$r   = (float) ($rates['cnt']['rate'] ?? 0);          // décimal (ex 0.01)
+$max = (float) ($rates['cnt']['max_salary'] ?? 0);    // salaire annuel max
+
+
+
+if ($adjustedRate > 0 && $hours > 0) {
+    $baseAnnual = $adjustedRate * $hours;             // $/an
+
+    if ($max > 0 && $baseAnnual > $max) {             // NOTE: strictement ">"
+        $cntValue = ($r * $max) / $hours;             // $/h au plafond
+    } else {
+        $cntValue = $adjustedRate * $r;               // $/h
+    }
+} else {
+    $cntValue = 0.0;
+}
+
+    $rateBeforeDowntime = $A + $rrqValue + $aeValue + $rqapValue + $csstValue + $fssqValue + $cntValue;
+
+    return [
+        'rrq'                  => $rrqValue,
+        'ae'                   => $aeValue,
+        'rqap'                 => $rqapValue,
+        'csst'                 => $csstValue,
+        'fssq'                 => $fssqValue,
+        'cnt'                  => $cntValue,
+        'rate_before_downtime' => $rateBeforeDowntime,
+        'total_annual_cost'    => $rateBeforeDowntime * $H,
+    ];
+}
+
 
     /**
      * Calcule les minutes productives et le pourcentage productif

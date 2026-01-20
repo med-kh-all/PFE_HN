@@ -40,7 +40,7 @@
                 </a>
             </li>
             <!-- 🔹 Fardeau de Main-d'œuvre (Pour les utilisateurs) -->
-           <li class="nav-item has-sub @if (request()->is(['user/fardeauMO/contributions','user/fardeauMO/administration*', 'user/fardeauMO/operations*', 'user/fardeauMO/analyse*'])) sidebar-group-active open @endif">
+           <li class="nav-item has-sub @if (request()->is(['user/fardeauMO/contributions', 'user/fardeauMO/operations*', 'user/fardeauMO/analyse*'])) sidebar-group-active open @endif">
     <a href="#" class="d-flex align-items-center">
         <i class="fas fa-briefcase"></i>
         <span class="menu-title text-truncate">Masse salariale</span>
@@ -57,15 +57,7 @@
             </a>
         </li>
 
-        <!-- 🔹 Administration -->
-        <!--  <li class="nav-item">
-           <a href="{{ route('user.fardeauMO.administration.index') }}" -->
-         <!-- class="nav-link {{ request()->routeIs('user.fardeauMO.administration.index') ? 'active' : '' }}" 
-                data-link="/user/fardeauMO/administration">
-                 <i class="fas fa-building"></i>
-                  <span class="menu-title text-truncate">Administration</span>
-             </a>
-         </li>-->
+       
 
        <!-- 🔹 Activités (anciennement Opérations) -->
        <li class="nav-item">
@@ -75,7 +67,7 @@
         </div>
     </a>
 
-    <ul class="collapse list-unstyled" id="operations">
+    <ul class="list-unstyled" >
         <li>
             <a href="{{ route('user.fardeauMO.operation_types.create') }}" class="btn btn-sm btn-primary d-block text-center">
                 <i class="fas fa-plus"></i> <!-- Le bouton "+" sans flèche -->
@@ -102,9 +94,9 @@
 
         <!-- 🔹 Analyse -->
         <li class="nav-item">
-            <a href="{{ route('user.fardeauMO.analysemo.index') }}" 
-               class="nav-link {{ request()->routeIs('user.fardeauMO.analysemo.index') ? 'active' : '' }}" 
-               data-link="/user/fardeauMO/analysemo">
+            <a href="{{ route('user.fardeauMO.analyse-mo.index') }}" 
+               class="nav-link {{ request()->routeIs('user.fardeauMO.analyse-mo.index') ? 'active' : '' }}" 
+               data-link="/user/fardeauMO/analyse-mo">
                 <i class="fas fa-chart-bar"></i>
                 <span class="menu-title text-truncate">Analyse</span>
             </a>

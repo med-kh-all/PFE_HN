@@ -18,25 +18,36 @@ class RecapitulatifActiviteController extends Controller
  
         // RecapitulatifActiviteController@recompute
         $agg = Employees::where('operation_type_id', $operationTypeId)
-            ->selectRaw('
-                COALESCE(SUM(hours_worked_annual),0)      as total_heures,
-                COALESCE(SUM(annual_salary_base),0)       as salaire_total, -- << ici
-                COALESCE(SUM(total_annual_cost),0)        as cout_total,
+     
+    ->selectRaw('
+        COALESCE(SUM(hours_worked_annual),0)      as total_heures,
+        COALESCE(SUM(annual_salary_base),0)       as salaire_total,
+        COALESCE(SUM(total_annual_cost),0)        as cout_total,
 
-                COALESCE(SUM(paid_vacation),0)            as vacances_total,
-                COALESCE(SUM(other_benefits_hourly),0)    as avantages_sociaux_total,
+        COALESCE(SUM(paid_vacation * hours_worked_annual),0) as vacances_total,
+        COALESCE(SUM(
+    (paid_vacation* hours_worked_annual) +
+    (rrq * hours_worked_annual) +
+    (ae * hours_worked_annual) +
+    (rqap * hours_worked_annual) +
+    (cnt * hours_worked_annual) +
+    (fssq * hours_worked_annual) 
+   
+),0) as avantages_sociaux_total,
 
-                COALESCE(SUM(rrq),0)                      as rrq_total,
-                COALESCE(SUM(ae),0)                       as ae_total,
-                COALESCE(SUM(rqap),0)                     as rqap_total,
-                COALESCE(SUM(cnt),0)                      as cnt_total,
-                COALESCE(SUM(fssq),0)                     as fssq_total,
-                COALESCE(SUM(csst),0)                     as csst_total,
 
-                COALESCE(SUM(bonus),0)                    as boni_total,
-                COALESCE(SUM(group_insurance),0)          as assurance_groupe_total
-            ')
-            ->first();
+        COALESCE(SUM(rrq * hours_worked_annual),0)   as rrq_total,
+        COALESCE(SUM(ae),0) as ae_total,
+        COALESCE(SUM(rqap * hours_worked_annual),0)  as rqap_total,
+        COALESCE(SUM(cnt * hours_worked_annual),0)   as cnt_total,
+        COALESCE(SUM(fssq * hours_worked_annual),0)  as fssq_total,
+        COALESCE(SUM(csst * hours_worked_annual),0)  as csst_total,
+
+        COALESCE(SUM(bonus),0)                       as boni_total,
+        COALESCE(SUM(group_insurance),0)             as assurance_groupe_total
+    ')
+    ->first();
+
 
  
         // Si tu as ccq_total côté employees, récupère-le, sinon 0

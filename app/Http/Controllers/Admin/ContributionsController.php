@@ -64,7 +64,7 @@ class ContributionsController extends Controller
         $validatedData['rrq_hourly_contribution'] = ($validatedData['rrq_max_contribution'] ?? 0) / 2080;
 
         $validatedData['ae_max_employee'] = ($request->ae_max_salary ?? 0) * (($request->ae_rate_employee ?? 0) / 100);
-        $validatedData['ae_max_employer'] = ($validatedData['ae_max_employee'] ?? 0) * (($request->ae_rate_employer ?? 0) / 100);
+        $validatedData['ae_max_employer'] = ($validatedData['ae_max_employee'] ?? 0) * (($request->ae_rate_employer ?? 1) );
         $validatedData['ae_hourly_contribution'] = ($validatedData['ae_max_employer'] ?? 0) / 2080;
 
         $validatedData['rqap_max_contribution'] = ($request->rqap_max_salary ?? 0) * (($request->rqap_rate_employee ?? 0) / 100);

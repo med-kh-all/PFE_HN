@@ -10,25 +10,30 @@ use App\Models\CamionCustomColumn;
 class CoutCamionController extends Controller
 {
     public function index()
-    {
-        $camions = CoutCamion::where('est_moyenne', false)->get();
-        $colonnesPersonnalisees = [];
+{
+    $camions = CoutCamion::where('est_moyenne', false)->get();
+    $colonnesPersonnalisees = [];
 
-        foreach ($camions as $camion) {
-            if (is_array($camion->colonnes_personnalisees)) {
-                foreach ($camion->colonnes_personnalisees as $key => $value) {
-                    if (!in_array($key, $colonnesPersonnalisees)) {
-                        $colonnesPersonnalisees[] = $key;
-                    }
+    foreach ($camions as $camion) {
+        if (is_array($camion->colonnes_personnalisees)) {
+            foreach ($camion->colonnes_personnalisees as $key => $value) {
+                if (!in_array($key, $colonnesPersonnalisees)) {
+                    $colonnesPersonnalisees[] = $key; // ICI → uniquement les slugs
                 }
             }
         }
-       
-$titresColonnesPersonnalisees = CamionCustomColumn::pluck('title', 'slug')->toArray();
-
-return view('user.coutscamion.index', compact('camions', 'colonnesPersonnalisees', 'titresColonnesPersonnalisees'));
-
     }
+
+    // Associer slug → titre
+    $titresColonnesPersonnalisees = CamionCustomColumn::pluck('title', 'slug')->toArray();
+
+    return view('user.coutscamion.index', compact(
+        'camions',
+        'colonnesPersonnalisees',
+        'titresColonnesPersonnalisees'
+    ));
+}
+
 
     public function store(Request $request)
     {
@@ -37,16 +42,17 @@ return view('user.coutscamion.index', compact('camions', 'colonnesPersonnalisees
         CoutCamion::where('est_moyenne', false)->delete();
         // 🔹 Enregistrement des titres des colonnes personnalisées
  // Sauvegarder les colonnes personnalisées
-    if ($request->has('custom_columns')) {
-        $columns = json_decode($request->input('custom_columns'), true);
-        foreach ($columns as $column) {
-            // Sauvegarder en base ou en session
-            CustomColumn::updateOrCreate(
+    if ($request->filled('custom_columns')) {
+    $columns = json_decode($request->input('custom_columns'), true) ?? [];
+    foreach ($columns as $column) {
+        if (!empty($column['slug']) && !empty($column['title'])) {
+            CamionCustomColumn::updateOrCreate(
                 ['slug' => $column['slug']],
                 ['title' => $column['title']]
             );
         }
     }
+}
 
         for ($i = 0; $i < $rowCount; $i++) {
             $data = [
@@ -106,4 +112,25 @@ return view('user.coutscamion.index', compact('camions', 'colonnesPersonnalisees
 
         return response()->json(['success' => true]);
     }
+
+    public function destroyColumn($slug)
+{
+    // Supprimer la définition de la colonne
+    CamionCustomColumn::where('slug', $slug)->delete();
+
+    // Retirer la colonne de chaque camion
+    $camions = CoutCamion::all();
+    foreach ($camions as $camion) {
+        $colonnes = $camion->colonnes_personnalisees ?? [];
+        if (isset($colonnes[$slug])) {
+            unset($colonnes[$slug]);
+            $camion->colonnes_personnalisees = $colonnes;
+            $camion->save();
+        }
+    }
+
+    return response()->json(['success' => true]);
+}
+
+
 }

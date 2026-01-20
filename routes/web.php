@@ -4,7 +4,7 @@ use App\Http\Controllers\Admin\AdminController;
 
 use App\Http\Controllers\User\AdministrationController;
 use App\Http\Controllers\User\OperationsController;
-use App\Http\Controllers\User\AnalysemoController;
+use App\Http\Controllers\User\AnalyseMasseSalarialeController;
 use App\Http\Controllers\User\ContributionsController;
 use App\Http\Controllers\User\EnteteActiviteController;
 use Illuminate\Support\Facades\Route;
@@ -147,15 +147,7 @@ Route::middleware('auth')->group(function () {
   
     
    // 🔹 Routes pour "Administration" (CRUD)
-Route::controller(\App\Http\Controllers\User\AdministrationController::class)->group(function () {
-    Route::get('/user/fardeauMO/administration', 'index')->name('user.fardeauMO.administration.index');
-    Route::get('/user/fardeauMO/administration/create', 'create')->name('user.fardeauMO.administration.create');
-    Route::post('/user/fardeauMO/administration/store', 'store')->name('user.fardeauMO.administration.store');
-    Route::get('/user/fardeauMO/administration/{id}', 'show')->name('user.fardeauMO.administration.show');
-    Route::get('/user/fardeauMO/administration/{id}/edit', 'edit')->name('user.fardeauMO.administration.edit');
-    Route::put('/user/fardeauMO/administration/{id}', 'update')->name('user.fardeauMO.administration.update');
-    Route::delete('/user/fardeauMO/administration/{id}', 'destroy')->name('user.fardeauMO.administration.destroy');
-});
+
 
 // 🔹 Routes pour "Opérations" (CRUD)
 Route::controller(\App\Http\Controllers\User\OperationsController::class)->group(function () {
@@ -168,10 +160,7 @@ Route::controller(\App\Http\Controllers\User\OperationsController::class)->group
     Route::delete('/user/fardeauMO/operations/{id}', 'destroy')->name('user.fardeauMO.operations.destroy');
 });
 
-// 🔹 Routes pour "Analyse" (Seulement `index`)
-Route::controller(\App\Http\Controllers\User\AnalysemoController::class)->group(function () {
-    Route::get('/user/fardeauMO/analysemo', 'index')->name('user.fardeauMO.analysemo.index');
-});
+
 
 // 🔹 Routes pour "Contributions" (CRUD complet)
 Route::controller(\App\Http\Controllers\User\ContributionsController::class)->group(function () {
@@ -217,7 +206,8 @@ Route::controller(\App\Http\Controllers\User\EmployeeController::class)->group(f
     Route::get('/user/coutscamion/{id}/edit', 'edit')->name('user.coutscamion.edit');
     Route::put('/user/coutscamion/{id}', 'update')->name('user.coutscamion.update');
     Route::delete('/user/coutscamion/{id}', 'destroy')->name('user.coutscamion.destroy');
-    
+    Route::delete('/user/coutscamion/column/{slug}', 'destroyColumn')
+    ->name('user.coutscamion.destroyColumn');
 });
 
 Route::controller(\App\Http\Controllers\User\EnteteActiviteController::class)->group(function () {
@@ -255,7 +245,17 @@ Route::controller(\App\Http\Controllers\User\AmortissementController::class)->gr
     Route::post('/amortissements/store-imported/{year}', 'storeImported')->name('user.amortissements.storeImported');
     Route::delete('/amortissements/{year}', 'destroy')->name('user.amortissements.destroy');
       // ✅ Nouvelle route ajoutée
+    Route::post('/amortissements/bulk-destroy',  'bulkDestroy') ->name('user.amortissements.bulkDestroy');
     Route::get('/amortissements/row', 'row')->name('user.amortissements.row');
+});
+Route::controller(\App\Http\Controllers\User\AnalyseMasseSalarialeController::class)->group(function () {
+    // Page Analyse (tableau + graphique)
+    Route::get('/user/fardeauMO/analyse-mo', 'index')
+        ->name('user.fardeauMO.analyse-mo.index');
+
+    // (Optionnel) Endpoint JSON si tu veux charger le graphe/les données en AJAX
+    Route::get('/user/fardeauMO/analyse-mo/data', 'data')
+        ->name('user.fardeauMO.analyse-mo.data');
 });
 
 

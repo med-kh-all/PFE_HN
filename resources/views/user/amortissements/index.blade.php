@@ -30,13 +30,17 @@
                                 <tr>
                                     <td>{{ $year->year }}</td>
                                     <td>
-                                        <a href="{{ route('user.amortissements.create') }}#year-{{ $year->year }}" class="btn btn-sm btn-info">Voir</a>
-                                        <form action="{{ route('user.amortissements.destroy', $year->year) }}" method="POST" style="display:inline-block">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="btn btn-sm btn-danger" onclick="return confirm('Confirmer la suppression ?')">Supprimer</button>
-                                        </form>
-                                    </td>
+  <a href="{{ route('user.amortissements.show', ['year' => $year->year]) }}"
+     class="btn btn-sm btn-info">Voir</a>
+
+  <form action="{{ route('user.amortissements.destroy', $year->year) }}"
+        method="POST" style="display:inline-block">
+      @csrf
+      @method('DELETE')
+      <button class="btn btn-sm btn-danger"
+              onclick="return confirm('Confirmer la suppression ?')">Supprimer</button>
+  </form>
+</td>
                                 </tr>
                             @endforeach
                         </tbody>
