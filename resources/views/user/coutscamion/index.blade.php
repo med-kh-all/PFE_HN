@@ -497,6 +497,11 @@ document.addEventListener("DOMContentLoaded",()=>{
     if(existingCamions.length===0) createRow();
     updateSummary();
 });
+// ✅ Bouton Ajouter une ligne
+document.getElementById("addRow").addEventListener("click", () => {
+    createRow();      // ajoute une ligne vide
+    updateSummary();  // met à jour le footer
+});
 // Sauvegarde AJAX du formulaire
 $('#camionForm').on('submit', function (e) {
     e.preventDefault();
